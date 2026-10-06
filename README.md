@@ -79,6 +79,8 @@ python scripts/package.py
 
 产物在 `dist/x-mention-saver.zip`，只包含插件运行文件、说明和许可证。GitHub Actions 自动运行测试和打包检查。改动和贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
+同一作者的另一个 X 插件：[X Daily Rings · 每日输出环](https://github.com/hskelp9527-pixel/x-daily-rings)，把每天的发帖、回复、引用数量做成三个圆环挂在页面上。
+
 ## English
 
 **Remember the people who asked you to mention them on X.**
