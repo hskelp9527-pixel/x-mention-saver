@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "记得 @ · X 用户名收藏",
+  "version": "1.0.0",
+  "description": "选中 X 用户名后点击旁边的保存按钮，收藏、备注并批量复制 @用户名。",
+  "permissions": ["storage", "clipboardWrite"],
+  "action": { "default_popup": "popup.html", "default_title": "记得 @" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [{
+    "matches": ["https://x.com/*", "https://twitter.com/*", "https://www.x.com/*", "https://www.twitter.com/*"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }]
+}

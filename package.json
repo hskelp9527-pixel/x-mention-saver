@@ -1,0 +1,13 @@
+{
+  "name": "x-mention-saver",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Save X handles next to selected text and copy mentions in one click.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test tests/model.test.mjs",
+    "test:browser": "node tests/browser.test.mjs"
+  },
+  "devDependencies": { "playwright-core": "1.61.1" }
+}

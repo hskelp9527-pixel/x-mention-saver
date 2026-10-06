@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>记得 @</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <header><div class="brand">@</div><div><h1>记得 @</h1><p>想起谁，就能 @ 谁。</p></div><span id="count" class="count">0 位</span></header>
+  <main>
+    <form id="add-form" class="card">
+      <label for="handle">收藏一个人</label>
+      <div class="add-row"><input id="handle" placeholder="@用户名 或 X 个人主页链接" required autocomplete="off" maxlength="200"><button class="primary" type="submit" id="save">添加</button></div>
+      <input id="note" placeholder="备注，例如：写长文时记得 @ 他" maxlength="160" aria-label="备注（可选）">
+      <button id="cancel-edit" type="button" hidden>取消编辑</button>
+    </form>
+    <div class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索用户名或备注" aria-label="搜索用户名或备注"></div>
+    <div class="list-top"><span>我的收藏</span><button id="select-all" type="button">全选当前结果</button></div>
+    <div id="list" aria-label="收藏列表"></div>
+    <div id="empty"><div class="empty-mark">@</div><strong>把想 @ 的人留在这里</strong><p>在 X 上选中完整的 @用户名，<br>点击旁边的「保存」，下次就不用找了。</p></div>
+    <div class="backup"><span>仅保存在本机</span><button id="export" type="button">导出备份</button><button id="import" type="button">导入</button><input id="import-file" type="file" accept="application/json,.json" hidden></div>
+  </main>
+  <footer><div class="copy-top"><span id="selection-count">已选 0 位</span><select id="separator" aria-label="复制格式"><option value="space">空格分隔</option><option value="line">每人一行</option></select></div><button id="copy-selected" class="primary copy" disabled>复制选中的 @用户名</button><p id="status" role="status" aria-live="polite">复制后，粘贴到 X 的正文或回复里。</p></footer>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
