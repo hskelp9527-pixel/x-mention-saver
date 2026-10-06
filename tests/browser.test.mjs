@@ -55,8 +55,11 @@ try {
 
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
-  await context.route('https://x.com/**', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><body style="font:20px system-ui;padding:120px 80px"><h2>模拟 X 页面 · 选中用户名即可收藏</h2><span id="handle">@BruceJinji711</span><p id="new">@new_friend</p><p id="invalid">普通文字</p><p id="email">person@example.com</p><p id="multi">@alice @bob</p><p id="long">@abcdefghijklmnop</p><p id="right" style="position:fixed;right:8px;top:25px">@near_edge</p><div contenteditable="true" id="editor">@in_editor</div></body></html>` }));
+  await context.route('https://x.com/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>选中保存演示</title></head><body style="font:20px system-ui;padding:120px 80px"><h2>模拟 X 页面 · 选中用户名即可收藏</h2><span id="handle">@BruceJinji711</span><p id="new">@new_friend</p><p id="invalid">普通文字</p><p id="email">person@example.com</p><p id="multi">@alice @bob</p><p id="long">@abcdefghijklmnop</p><p id="right" style="position:fixed;right:8px;top:25px">@near_edge</p><div contenteditable="true" id="editor">@in_editor</div></body></html>` }));
   await page.goto('https://x.com/home');
+  assert.equal(await page.evaluate(() => document.characterSet), 'UTF-8');
+  assert.equal(await page.locator('h2').textContent(), '模拟 X 页面 · 选中用户名即可收藏');
+  assert.equal(await page.locator('#invalid').textContent(), '普通文字');
   await page.waitForFunction(() => [...document.documentElement.children].some(el => el.style.zIndex === '2147483647'));
   console.log('Loaded selection script');
   async function select(elementId) {
