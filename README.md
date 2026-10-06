@@ -14,11 +14,11 @@
 
 在 X 页面选中用户名，保存按钮出现在旁边，避开选中文字。以下演示使用模拟页面与测试数据。
 
-![选中用户名后显示保存按钮](docs/images/selection-preview.png)
+![选中用户名后显示保存按钮](docs/images/selection-preview-utf8.png)
 
 搜索、备注、勾选，然后一键复制成 `@alice @bob`。
 
-<img src="docs/images/popup-preview.png" width="390" alt="收藏列表和批量复制弹窗">
+<img src="docs/images/popup-preview-utf8.png" width="390" alt="收藏列表和批量复制弹窗">
 
 ## 能做什么
 
