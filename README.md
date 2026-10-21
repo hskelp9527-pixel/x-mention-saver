@@ -103,7 +103,7 @@ Windows Chrome / Edge 使用 `x-mention-saver.zip`。在 X 发帖或回复编辑
 | 平台 | 使用方式与状态 |
 | --- | --- |
 | Windows Chrome / Edge | 原开发者模式安装方式；浏览器自动化测试使用模拟 X 页面 |
-| Android Firefox 128+ | 使用 Firefox 专用清单与经典 background scripts；尚待 Android 真机验证 |
+| Android Firefox 142+ | 使用 Firefox 专用清单与经典 background scripts；尚待 Android 真机验证 |
 | Android Chrome、iPhone Chrome | 不运行本扩展，请改用支持扩展的浏览器 |
 | iPhone Safari | 仅提供可转换 WebExtension 源码，需 macOS / Xcode 转换、签名、设备测试和分发；当前没有可直接安装的 iPhone 包 |
 | X App | 无法加载浏览器扩展，需在浏览器打开 X |

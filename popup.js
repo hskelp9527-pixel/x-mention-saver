@@ -127,7 +127,7 @@ if (window.parent !== window) {
   $('close-panel').hidden = false;
   const closePanel = () => {
     try {
-      const origin = new URL(document.referrer).origin;
+      const origin = new URLSearchParams(location.search).get('parentOrigin') || new URL(document.referrer).origin;
       if (/^https:\/\/(www\.)?(x|twitter)\.com$/.test(origin)) window.parent.postMessage({ type: 'xms-close-panel' }, origin);
     } catch {}
   };

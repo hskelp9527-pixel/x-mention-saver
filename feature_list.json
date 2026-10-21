@@ -4,41 +4,42 @@
     {
       "id": "display-name-migration",
       "implemented": true,
-      "verification": "pending-primary-agent"
+      "verification": "desktop-passed"
     },
     {
       "id": "composer-collection-panel",
       "implemented": true,
-      "verification": "pending-primary-agent"
+      "verification": "desktop-passed"
     },
     {
       "id": "safe-copy-boundaries",
       "implemented": true,
-      "verification": "pending-primary-agent"
+      "verification": "desktop-passed"
     },
     {
       "id": "local-backup-v2",
       "implemented": true,
-      "verification": "pending-primary-agent"
+      "verification": "desktop-passed"
     },
     {
       "id": "responsive-touch-ui",
       "implemented": true,
-      "verification": "pending-primary-agent"
+      "verification": "desktop-passed; device-not-tested"
     },
     {
       "id": "firefox-package",
       "implemented": true,
-      "verification": "pending-primary-agent"
+      "verification": "desktop-passed; device-not-tested"
     },
     {
       "id": "release-workflow",
       "implemented": true,
-      "verification": "pending-primary-agent"
+      "verification": "desktop-passed"
     }
   ],
   "deviceValidation": {
     "firefoxAndroid": "not-run",
     "safariIOS": "conversion-source-only"
-  }
+  },
+  "verification": "desktop-tests-passed; android-device-user-validation-pending"
 }

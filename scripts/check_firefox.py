@@ -8,7 +8,7 @@ assert f['manifest_version'] == 3
 assert f['version'] == c['version']
 assert f['background'] == {'scripts': ['background-firefox.js']}
 assert 'service_worker' not in f['background']
-assert f['browser_specific_settings']['gecko_android']['strict_min_version'] == '128.0'
+assert f['browser_specific_settings']['gecko_android']['strict_min_version'] == '142.0'
 assert f['permissions'] == ['storage', 'clipboardWrite']
 assert f['content_scripts'] == c['content_scripts']
 assert f['web_accessible_resources'] == c['web_accessible_resources']

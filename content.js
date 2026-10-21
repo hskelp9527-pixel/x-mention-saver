@@ -126,7 +126,7 @@
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '记得 @ 收藏');
     panel.style.cssText = 'position:fixed;z-index:2147483646;background:white;border:1px solid #b4d6fa;border-radius:14px;box-shadow:0 8px 40px #0004;overflow:hidden';
     frame = document.createElement('iframe');
-    frame.src = chrome.runtime.getURL('popup.html'); frame.title = '记得 @ 收藏';
+    frame.src = chrome.runtime.getURL('popup.html') + '?parentOrigin=' + encodeURIComponent(location.origin); frame.title = '记得 @ 收藏';
     frame.allow = 'clipboard-write';
     frame.style.cssText = 'width:100%;height:100%;border:0;display:block';
     panel.append(frame); document.documentElement.append(panel); fit();
@@ -150,7 +150,7 @@
     scheduled = true; requestAnimationFrame(() => { scheduled = false; mount(); });
   }).observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener('message', event => {
-    if (frame && event.source === frame.contentWindow && event.origin === new URL(chrome.runtime.getURL('')).origin && event.data?.type === 'xms-close-panel') close();
+    if (frame && event.source === frame.contentWindow && event.origin === chrome.runtime.getURL('').replace(/\/$/, '') && event.data?.type === 'xms-close-panel') close();
   });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
   window.visualViewport?.addEventListener('resize', fit);
