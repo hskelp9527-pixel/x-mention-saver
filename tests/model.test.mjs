@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeHandle, selectionPattern, mergeEntry, mentions, copyMentions, migrateEntries } from '../model.js';
+import { normalizeHandle, selectionPattern, mergeEntry, mentions, copyMentions, migrateEntries, normalizeAvatarUrl, enrichEntries } from '../model.js';
 
 test('selection requires one @ handle; manual input also accepts profiles', () => {
   for (const value of ['@brucejinji711', '@a', '@a_B12']) assert.ok(selectionPattern.test(value));
@@ -29,12 +29,23 @@ test('case-insensitive duplicate saves preserve notes and batch copy includes @'
 
 test('legacy migration keeps identity, timestamps and notes; display names are explicit', () => {
   const old = migrateEntries([{ id: 'bad', handle: 'Alice', note: '保留', createdAt: 42 }]);
-  assert.deepEqual(old, [{ id: 'alice', handle: 'Alice', note: '保留', createdAt: 42, displayName: '' }]);
+  assert.deepEqual(old, [{ id: 'alice', handle: 'Alice', note: '保留', createdAt: 42, displayName: '', avatarUrl: '' }]);
   const named = mergeEntry(old, 'alice', '', false, '爱丽丝').entries;
   assert.equal(named[0].note, '保留'); assert.equal(named[0].displayName, '爱丽丝');
   assert.equal(mergeEntry(named, 'ALICE', '', false, '页面新名称').entries[0].displayName, '爱丽丝');
   assert.equal(mergeEntry(named, 'alice', '新备注', true, '手动名').entries[0].displayName, '手动名');
   assert.throws(() => migrateEntries([{ handle: 'alice', displayName: {} }]));
+});
+
+test('official avatars survive backups; scanning updates only saved people and retains notes',()=>{
+  const avatar='https://pbs.twimg.com/profile_images/123/alice_normal.jpg';
+  assert.equal(normalizeAvatarUrl(avatar),avatar);
+  for(const value of ['javascript:alert(1)','https://evil.test/profile_images/a.jpg','https://pbs.twimg.com.evil.test/profile_images/a.jpg','https://pbs.twimg.com/media/a.jpg'])assert.throws(()=>normalizeAvatarUrl(value));
+  const saved=mergeEntry([], 'alice', '私人备注', false, '旧昵称', avatar).entries;
+  const result=enrichEntries(saved,[{handle:'ALICE',displayName:'新昵称',avatarUrl:avatar},{handle:'stranger',displayName:'路人',avatarUrl:''}]);
+  assert.equal(result.entries.length,1);assert.equal(result.entries[0].displayName,'新昵称');assert.equal(result.entries[0].note,'私人备注');assert.equal(result.updated,1);
+  assert.equal(migrateEntries(result.entries)[0].avatarUrl,avatar);
+  assert.throws(()=>migrateEntries([{handle:'alice',avatarUrl:'https://evil.test/tracker'}]));
 });
 
 test('clipboard mentions force safe separation and outer text boundaries', () => {

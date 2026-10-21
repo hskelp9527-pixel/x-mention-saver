@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 let listener;
 let saved = { entries: [{ handle: 'alice', note: '旧备注', createdAt: 123 }] };
 globalThis.chrome = {
+  tabs: { query:async()=>[{id:1}],sendMessage:async()=>({profiles:[{handle:'alice',displayName:'扫描昵称',avatarUrl:'https://pbs.twimg.com/profile_images/123/alice.jpg'},{handle:'stranger',displayName:'未保存',avatarUrl:''}]}) },
   runtime: { id: 'extension-id', getURL: path => 'chrome-extension://extension-id/' + path, onMessage: { addListener: fn => { listener = fn; } } },
   storage: { local: { get: async () => structuredClone(saved), set: async data => { saved = structuredClone(data); } } }
 };
@@ -29,4 +30,15 @@ test('sender boundary protects collections and migration/import stay atomic', as
   // Failed work does not poison subsequent requests on the shared queue.
   assert.equal((await request({ type: 'save', handle: 'bob', displayName: '鲍勃' }, ui)).ok, true);
   assert.equal((await request({ type: 'list' }, ui)).entries.length, 2);
+});
+
+test('scan uses the page tab and enrich never discloses saved collections to content',async()=>{
+  assert.equal((await request({type:'scan'},content)).ok,false);
+  const scanned=await request({type:'scan'},ui);assert.equal(scanned.ok,true);assert.equal(scanned.profiles.length,2);
+  assert.equal(scanned.entries.find(e=>e.id==='alice').avatarUrl,'https://pbs.twimg.com/profile_images/123/alice.jpg');
+  assert.equal(scanned.entries.some(e=>e.id==='stranger'),false);
+  const enriched=await request({type:'enrich',profiles:[{handle:'alice',displayName:'再次识别',avatarUrl:''}]},content);
+  assert.equal(enriched.ok,true);assert.equal(enriched.entries,undefined);assert.equal(enriched.profiles,undefined);
+  const before=structuredClone(saved);
+  assert.equal((await request({type:'import',entries:[{handle:'good'},{handle:'bad',avatarUrl:'https://evil.test/tracker'}]},ui)).ok,false);assert.deepEqual(saved,before);
 });

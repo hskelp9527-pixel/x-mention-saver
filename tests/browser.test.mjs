@@ -20,6 +20,7 @@ try {
     viewport: { width: 1000, height: 740 }
   });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+  context.setDefaultTimeout(10000);
   const id = new URL(worker.url()).host;
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const errors = [];
@@ -28,11 +29,14 @@ try {
   await popup.goto(`chrome-extension://${id}/popup.html`);
   await popup.waitForFunction(() => document.querySelector('#select-all').disabled);
   console.log('Loaded extension popup');
+  assert.equal(await popup.locator('#manual-add').getAttribute('open'), null);
+  await popup.locator('#manual-add summary').click();
   await popup.locator('#handle').fill('@brucejinji711');
   await popup.locator('#note').fill('长文时记得 @ 他');
   await popup.locator('#save').click();
   await popup.locator('.person').waitFor();
   assert.equal(await popup.locator('.person').count(), 1);
+  await popup.locator('#manual-add summary').click();
   await popup.locator('#handle').fill('https://x.com/another_user');
   await popup.locator('#save').click();
   await popup.waitForFunction(() => document.querySelectorAll('.person').length === 2);
@@ -55,7 +59,8 @@ try {
 
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
-  await context.route('https://x.com/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>选中保存演示</title></head><body style="font:20px system-ui;padding:120px 80px"><h2>模拟 X 页面 · 选中用户名即可收藏</h2><span id="handle">@BruceJinji711</span><div data-testid="User-Name"><a href="/new_friend"><span dir="auto">新朋友</span></a><a href="/new_friend"><span id="new">@new_friend</span></a></div><p id="invalid">普通文字</p><p id="email">person@example.com</p><p id="multi">@alice @bob</p><p id="long">@abcdefghijklmnop</p><p id="right" style="position:fixed;right:8px;top:25px">@near_edge</p><section class="composer" id="composer1"><div contenteditable="true" id="editor" data-testid="tweetTextarea_0">@in_editor</div><div data-testid="toolBar" id="toolbar1" style="display:flex;align-items:center;height:36px;flex-wrap:nowrap"><button type="button">媒体</button></div></section><section class="composer" id="composer2"><div contenteditable="true" id="editor2" data-testid="tweetTextarea_1">回复草稿</div><div role="toolbar" id="toolbar2" style="display:flex;align-items:center;height:36px;flex-wrap:nowrap"><button type="button">表情</button></div></section><section class="composer" id="fallback-composer"><div contenteditable="true" id="editor3" data-testid="tweetTextarea_2">没有工具栏的草稿</div></section><script>document.querySelectorAll('.composer').forEach(node => { node.dataset.beforeHeight = node.getBoundingClientRect().height; });</script></body></html>` }));
+  await context.route('https://x.com/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>选中保存演示</title></head><body style="font:20px system-ui;padding:120px 80px"><h2>模拟 X 页面 · 选中用户名即可收藏</h2><span id="handle">@BruceJinji711</span><article><a href="/new_friend"><img width="28" height="28" src="https://pbs.twimg.com/profile_images/123/new_normal.jpg"></a><div data-testid="User-Name"><a href="/new_friend"><span dir="auto">新朋友</span></a><a href="/new_friend"><span id="new">@new_friend</span></a></div></article><div data-testid="UserCell"><a href="/scan_friend"><img width="28" height="28" src="https://pbs.twimg.com/profile_images/456/scan_normal.jpg"></a><a href="/scan_friend"><span dir="auto">扫描朋友</span></a><a href="/scan_friend"><span>@scan_friend</span></a></div><p id="invalid">普通文字</p><p id="email">person@example.com</p><p id="multi">@alice @bob</p><p id="long">@abcdefghijklmnop</p><p id="right" style="position:fixed;right:8px;top:25px">@near_edge</p><section class="composer" id="composer1"><div contenteditable="true" id="editor" data-testid="tweetTextarea_0">@in_editor</div><div data-testid="toolBar" id="toolbar1" style="display:flex;align-items:center;height:36px;flex-wrap:nowrap"><button type="button">媒体</button></div></section><section class="composer" id="composer2"><div contenteditable="true" id="editor2" data-testid="tweetTextarea_1">回复草稿</div><div role="toolbar" id="toolbar2" style="display:flex;align-items:center;height:36px;flex-wrap:nowrap"><button type="button">表情</button></div></section><section class="composer" id="fallback-composer"><div contenteditable="true" id="editor3" data-testid="tweetTextarea_2">没有工具栏的草稿</div></section><script>document.querySelectorAll('.composer').forEach(node => { node.dataset.beforeHeight = node.getBoundingClientRect().height; });</script></body></html>` }));
+  await context.route('https://pbs.twimg.com/profile_images/**', route => route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64') }));
   await page.goto('https://x.com/home');
   assert.equal(await page.evaluate(() => document.characterSet), 'UTF-8');
   assert.equal(await page.locator('h2').textContent(), '模拟 X 页面 · 选中用户名即可收藏');
@@ -132,19 +137,59 @@ try {
   await floating.waitFor({ state: 'detached' });
   assert.equal(await page.locator('[data-xms-launcher]').count(), 2);
   // The compact panel is extension-origin and never edits a draft.
-  assert.equal((await worker.evaluate(() => chrome.storage.local.get('entries'))).entries.find(entry => entry.id === 'new_friend').displayName, '新朋友');
+  await page.bringToFront();
+  const savedFriend = (await worker.evaluate(() => chrome.storage.local.get('entries'))).entries.find(entry => entry.id === 'new_friend');
+  assert.equal(savedFriend.displayName, '新朋友');
+  assert.equal(savedFriend.avatarUrl, 'https://pbs.twimg.com/profile_images/123/new_normal.jpg');
+  assert.equal(await page.locator('[data-xms-panel]').count(), 0);
+  assert.equal(await page.locator('[data-xms-launcher]').nth(1).getAttribute('aria-expanded'), 'false');
   await page.setViewportSize({ width: 320, height: 500 });
   await page.locator('[data-xms-launcher]').nth(1).click();
   const savedPanel = page.frameLocator('iframe[title="记得 @ 收藏"]');
   await savedPanel.locator('#search').fill('新朋友');
   assert.equal(await savedPanel.locator('.person').count(), 1);
   assert.equal(await page.locator('#editor2').textContent(), '回复草稿');
+  assert.equal(await savedPanel.locator('#manual-add').getAttribute('open'), null);
+  assert.equal(await savedPanel.locator('.person .avatar img').getAttribute('src'), 'https://pbs.twimg.com/profile_images/123/new_normal.jpg');
+  const anchor = await page.locator('[data-xms-launcher]').nth(1).boundingBox();
+  const dropdown = await page.locator('[data-xms-panel]').boundingBox();
+  assert.ok(Math.abs(dropdown.y - (anchor.y + anchor.height)) <= 9 || Math.abs(dropdown.y + dropdown.height - anchor.y) <= 9, 'dropdown is attached below or above its @ anchor');
+  assert.equal(await savedPanel.locator('#page-people').evaluate(e=>e.open), false);
+  await savedPanel.locator('#page-people summary').click();
+  await savedPanel.locator('[aria-label="保存 @scan_friend"]').waitFor();
+  await savedPanel.locator('[aria-label="保存 @scan_friend"]').click();
+  await savedPanel.locator('[aria-label="保存 @scan_friend"]:disabled').waitFor();
+  await popup.waitForFunction(async()=>Boolean((await chrome.storage.local.get('entries')).entries.find(e=>e.id==='scan_friend')));
+  const scannedFriend = (await worker.evaluate(() => chrome.storage.local.get('entries'))).entries.find(e => e.id === 'scan_friend');
+  assert.equal(scannedFriend.displayName, '扫描朋友');
+  assert.equal(scannedFriend.avatarUrl, 'https://pbs.twimg.com/profile_images/456/scan_normal.jpg');
+  // Return to the original collection size after exercising scan-and-save.
+  await popup.evaluate(() => chrome.runtime.sendMessage({ type: 'remove', id: 'scan_friend' }));
+  await savedPanel.locator('#page-people summary').click();
+  await page.screenshot({ path: join(output, 'dropdown-preview.png') });
+  console.log('Verified profile scan and compact dropdown');
+
   const panelBounds = await page.locator('[data-xms-panel]').boundingBox();
   assert.ok(panelBounds.x >= 0 && panelBounds.width <= 320 && panelBounds.height <= 480);
   await savedPanel.locator('#search').focus();
   await page.keyboard.press('Escape');
   await page.locator('[data-xms-panel]').waitFor({ state: 'detached' });
   assert.equal(await page.locator('[data-xms-launcher]').nth(1).evaluate(el => el === document.activeElement), true);
+  assert.equal(await page.locator('[data-xms-launcher]').nth(1).getAttribute('aria-expanded'), 'false');
+  await page.locator('[data-xms-launcher]').nth(1).click();
+  await page.locator('[data-xms-panel]').waitFor();
+  console.log('Testing dropdown scrolling');
+  await page.evaluate(()=>window.scrollBy(0,-10));
+  await page.waitForTimeout(70);
+  const movedAnchor=await page.locator('[data-xms-launcher]').nth(1).boundingBox(),movedPanel=await page.locator('[data-xms-panel]').boundingBox();
+  assert.ok(Math.abs(movedPanel.y+movedPanel.height-movedAnchor.y)<=9||Math.abs(movedPanel.y-movedAnchor.y-movedAnchor.height)<=9,'dropdown follows page scrolling');
+  await page.evaluate(()=>{const spacer=document.createElement('div');spacer.style.height='800px';document.body.append(spacer);window.scrollTo(0,document.body.scrollHeight);});
+  await page.locator('[data-xms-panel]').waitFor({state:'detached'});
+  console.log('Verified offscreen close');
+  await page.locator('[data-xms-launcher]').nth(1).click();
+  await page.locator('[data-xms-panel]').waitFor();
+  await page.mouse.click(2, 2);
+  await page.locator('[data-xms-panel]').waitFor({ state:'detached' });
   await page.setViewportSize({ width: 1000, height: 740 });
   // Reopening keeps data while resetting the temporary selection.
   await popup.reload();
@@ -161,6 +206,9 @@ try {
   await popup.waitForFunction(() => document.querySelector('#count').textContent === '2 位');
   assert.deepEqual(errors, []);
   console.log('PASS: real extension storage, popup CRUD/search/copy, strict selection, button placement, duplicate protection, persistence, atomic import.');
+} catch (error) {
+  console.error(error);
+  throw error;
 } finally {
   if (context) await context.close();
   await rm(profile, { recursive: true, force: true });

@@ -13,32 +13,16 @@
   document.documentElement.append(host);
   let handle = '';
   let displayName = '';
+  let avatarUrl = '';
   let busy = false;
   let feedback = false;
   let timer;
   let frame;
   const hide = () => { host.style.display = 'none'; handle = ''; feedback = false; clearTimeout(timer); };
 
-  function extractName(element, selectedHandle) {
-    const block = element?.closest('[data-testid="User-Name"], [data-testid="UserCell"], [data-testid="UserName"]');
-    // A nearby post or arbitrary profile link is not reliable evidence of a name.
-    if (!block) return '';
-    const wanted = selectedHandle.slice(1).toLowerCase();
-    if (block.dataset.testid === 'UserName') {
-      const nodes = [...block.querySelectorAll('span, [dir="auto"]')];
-      if (!nodes.some(node => node.textContent.trim().toLowerCase() === selectedHandle.toLowerCase())) return '';
-      return nodes.find(node => node.matches('[dir="auto"]') && node.textContent.trim() && !node.textContent.trim().startsWith('@'))?.textContent.trim().slice(0, 100) || '';
-    }
-    const links = [...block.querySelectorAll('a[href]')].filter(link => {
-      try { return new URL(link.href).pathname.toLowerCase().replace(/\/$/, '') === '/' + wanted; } catch { return false; }
-    });
-    const nameLink = links.find(link => link.textContent.trim() && !link.textContent.trim().startsWith('@'));
-    if (!nameLink) return '';
-    // X puts the display name inside dir=auto; exclude badge accessibility text.
-    return (nameLink.querySelector('[dir="auto"]')?.textContent || nameLink.textContent).trim().slice(0, 100);
-  }
   function refresh() {
     if (busy) return;
+    if (document.querySelector('[data-xms-panel]')) { hide(); return; }
     const selection = window.getSelection();
     const text = selection?.toString().trim() ?? '';
     if (!pattern.test(text) || !selection.rangeCount || selection.isCollapsed) { hide(); return; }
@@ -52,7 +36,9 @@
     if (rect.bottom < 0 || rect.top > innerHeight || rect.right < 0 || rect.left > innerWidth) { hide(); return; }
     if (text !== handle) { feedback = false; clearTimeout(timer); }
     handle = text;
-    displayName = extractName(element, text);
+    const profile = globalThis.XMSProfiles.extract(element, text);
+    displayName = profile.displayName;
+    avatarUrl = profile.avatarUrl;
     if (!feedback) button.textContent = '+ 保存';
     button.disabled = false;
     host.style.display = 'block';
@@ -83,7 +69,7 @@
     button.disabled = true;
     button.textContent = '保存中…';
     try {
-      const result = await chrome.runtime.sendMessage({ type: 'save', handle: savedHandle, displayName });
+      const result = await chrome.runtime.sendMessage({ type: 'save', handle: savedHandle, displayName, avatarUrl });
       if (!result?.ok) throw new Error(result?.error || '保存失败');
       button.textContent = result.duplicate ? '✓ 已收藏' : '✓ 已保存';
     } catch {
@@ -97,6 +83,7 @@
     }
   });
   document.addEventListener('selectionchange', schedule);
+  document.addEventListener('xms-panel-open', hide);
   document.addEventListener('scroll', schedule, true);
   window.addEventListener('resize', schedule);
   document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
@@ -107,21 +94,27 @@
 (() => {
   const editorSelector = '[contenteditable="true"][data-testid^="tweetTextarea_"],textarea[data-testid^="tweetTextarea_"]';
   const mounted = new Map();
-  let panel, frame, launcher;
-  function close() {
+  let panel, frame, launcher, desiredHeight = 280;
+  function close(restoreFocus = true) {
     panel?.remove(); panel = null; frame = null;
-    if (launcher?.isConnected) launcher.focus();
+    launcher?.setAttribute('aria-expanded', 'false');
+    if (restoreFocus && launcher?.isConnected) launcher.focus();
   }
   function fit() {
     if (!panel) return;
     const viewport = window.visualViewport;
-    panel.style.left = `${(viewport?.offsetLeft || 0) + 8}px`;
-    panel.style.top = `${(viewport?.offsetTop || 0) + 8}px`;
-    panel.style.width = `${Math.min(360, (viewport?.width || innerWidth) - 16)}px`;
-    panel.style.height = `${Math.max(80, Math.min(480, (viewport?.height || innerHeight) - 16))}px`;
+    const left=viewport?.offsetLeft||0, top=viewport?.offsetTop||0, width=viewport?.width||innerWidth, height=viewport?.height||innerHeight;
+    const rect=launcher.getBoundingClientRect(), panelWidth=Math.min(340,width-16);
+    if(rect.bottom<top||rect.top>top+height||rect.right<left||rect.left>left+width){close(false);return;}
+    const below=top+height-rect.bottom-14, above=rect.top-top-14;
+    const useBelow=below>=Math.min(desiredHeight,above), panelHeight=Math.max(90,Math.min(desiredHeight,400,height-16,useBelow?below:above));
+    panel.style.left=`${Math.max(left+8,Math.min(rect.left,left+width-panelWidth-8))}px`;
+    panel.style.top=`${Math.max(top+8,Math.min(useBelow?rect.bottom+6:rect.top-panelHeight-6,top+height-panelHeight-8))}px`;
+    panel.style.width=`${panelWidth}px`;panel.style.height=`${panelHeight}px`;
   }
   function open(button) {
-    close(); launcher = button;
+    if(panel&&launcher===button){close();return;}
+    close(false); launcher = button;desiredHeight=280;launcher.setAttribute('aria-expanded','true');
     panel = document.createElement('div');
     panel.dataset.xmsPanel = '';
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '记得 @ 收藏');
@@ -131,6 +124,7 @@
     frame.allow = 'clipboard-write';
     frame.style.cssText = 'width:100%;height:100%;border:0;display:block';
     panel.append(frame); document.documentElement.append(panel); fit();
+    document.dispatchEvent(new Event('xms-panel-open'));
     frame.addEventListener('load', () => frame.focus());
   }
   function toolbarFor(editor) {
@@ -179,6 +173,7 @@
       button.type = 'button'; button.textContent = '@'; button.dataset.xmsLauncher = '';
       button.title = '记得 @';
       button.setAttribute('aria-label', '打开记得 @ 收藏'); button.setAttribute('aria-haspopup', 'dialog');
+      button.setAttribute('aria-expanded', 'false');
       button.style.cssText = 'box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:0 0 30px;width:30px;height:30px;min-width:30px;max-height:30px;padding:0;margin:0;border:0;border-radius:50%;background:transparent;color:rgb(29,155,240);font:600 20px/1 system-ui;cursor:pointer;touch-action:manipulation;vertical-align:middle';
       button.addEventListener('click', () => open(button));
       let floating = !toolbar;
@@ -206,13 +201,34 @@
     scheduled = true; requestAnimationFrame(() => { scheduled = false; mount(); });
   }).observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener('message', event => {
-    if (frame && event.source === frame.contentWindow && event.origin === chrome.runtime.getURL('').replace(/\/$/, '') && event.data?.type === 'xms-close-panel') close();
+    if (!frame || event.source !== frame.contentWindow || event.origin !== chrome.runtime.getURL('').replace(/\/$/, '')) return;
+    if(event.data?.type==='xms-close-panel')close();
+    else if(event.data?.type==='xms-panel-size'&&Number.isFinite(event.data.height)){
+      const next=Math.max(180,Math.min(400,event.data.height));if(Math.abs(next-desiredHeight)>1){desiredHeight=next;fit();}
+    }
   });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+  document.addEventListener('pointerdown',event=>{if(panel&&!panel.contains(event.target)&&!launcher?.contains(event.target))close(false);},true);
   const reposition = () => { placeFloating(); fit(); };
   window.visualViewport?.addEventListener('resize', reposition);
   window.visualViewport?.addEventListener('scroll', reposition);
   window.addEventListener('resize', reposition);
-  document.addEventListener('scroll', placeFloating, true);
+  document.addEventListener('scroll', reposition, true);
   mount();
+})();
+
+// Refresh saved profiles from visible X information. Unknown people remain unsaved.
+(() => {
+  let timer, signature='';
+  const scan=()=>globalThis.XMSProfiles.scan();
+  chrome.runtime.onMessage.addListener((message,sender,respond)=>{
+    if(sender.id!==chrome.runtime.id||message?.type!=='xms-scan-profiles')return;
+    respond({profiles:scan()});return false;
+  });
+  const update=()=>{
+    const profiles=scan(), next=JSON.stringify(profiles);if(next===signature)return;signature=next;
+    chrome.runtime.sendMessage({type:'enrich',profiles}).catch(()=>{});
+  };
+  new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(update,350);}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src','href']});
+  update();
 })();

@@ -4,7 +4,7 @@ import json
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
-common = ["model.js", "content.js", "popup.html", "popup.css", "popup.js", "README.md", "LICENSE"]
+common = ["profile.js", "model.js", "content.js", "popup.html", "popup.css", "popup.js", "README.md", "LICENSE"]
 manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
 firefox = json.loads((root / "manifest.firefox.json").read_text(encoding="utf-8"))
 package = json.loads((root / "package.json").read_text(encoding="utf-8"))

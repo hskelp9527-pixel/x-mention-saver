@@ -1,5 +1,5 @@
 {
-  "version": "1.1.1",
+  "version": "1.2.0",
   "features": [
     {
       "id": "display-name-migration",
@@ -17,7 +17,7 @@
       "verification": "desktop-passed"
     },
     {
-      "id": "local-backup-v2",
+      "id": "local-backup-v3",
       "implemented": true,
       "verification": "desktop-passed"
     },
@@ -33,6 +33,16 @@
     },
     {
       "id": "release-workflow",
+      "implemented": true,
+      "verification": "desktop-passed"
+    },
+    {
+      "id": "avatar-profile-dom-scan",
+      "implemented": true,
+      "verification": "desktop-passed"
+    },
+    {
+      "id": "collapsed-anchored-dropdown",
       "implemented": true,
       "verification": "desktop-passed"
     }

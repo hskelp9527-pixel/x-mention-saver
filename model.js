@@ -1,6 +1,18 @@
 export const selectionPattern = /^@[A-Za-z0-9_]{1,15}$/;
 const reserved = new Set(['home', 'explore', 'notifications', 'messages', 'settings', 'search', 'compose', 'i', 'intent', 'share']);
 
+export function normalizeAvatarUrl(input = '') {
+  if (!input) return '';
+  if (typeof input !== 'string' || input.length > 2048) throw new Error('头像链接格式不正确');
+  let url;
+  try { url = new URL(input); } catch { throw new Error('头像链接格式不正确'); }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port || !(
+    (url.hostname === 'pbs.twimg.com' && url.pathname.startsWith('/profile_images/')) ||
+    (url.hostname === 'abs.twimg.com' && url.pathname.startsWith('/sticky/default_profile_images/'))
+  )) throw new Error('只接受 X 页面中的官方头像链接');
+  url.hash = ''; return url.href;
+}
+
 export function normalizeHandle(input) {
   let value = String(input ?? '').trim();
   if (/^https?:\/\//i.test(value)) {
@@ -21,22 +33,40 @@ export function normalizeHandle(input) {
 export function migrateEntries(entries) {
   if (!Array.isArray(entries)) throw new Error('收藏数据无法读取，请先导出备份');
   return entries.map(entry => {
-    if (!entry || typeof entry.handle !== 'string' || (entry.note !== undefined && typeof entry.note !== 'string') || (entry.displayName !== undefined && typeof entry.displayName !== 'string')) throw new Error('备份中有无效条目');
+    if (!entry || typeof entry.handle !== 'string' || (entry.note !== undefined && typeof entry.note !== 'string') || (entry.displayName !== undefined && typeof entry.displayName !== 'string') || (entry.avatarUrl !== undefined && typeof entry.avatarUrl !== 'string')) throw new Error('备份中有无效条目');
     const handle = normalizeHandle(entry.handle);
-    return { id: handle.toLowerCase(), handle, displayName: String(entry.displayName || '').trim().slice(0, 100), note: String(entry.note || '').trim().slice(0, 160), createdAt: Number.isFinite(entry.createdAt) ? entry.createdAt : Date.now() };
+    return { id: handle.toLowerCase(), handle, displayName: String(entry.displayName || '').trim().slice(0, 100), avatarUrl: normalizeAvatarUrl(entry.avatarUrl), note: String(entry.note || '').trim().slice(0, 160), createdAt: Number.isFinite(entry.createdAt) ? entry.createdAt : Date.now() };
   });
 }
 
-export function mergeEntry(entries, input, note = '', updateNote = false, displayName = '') {
+export function mergeEntry(entries, input, note = '', updateNote = false, displayName = '', avatarUrl = '') {
   const handle = normalizeHandle(input);
   const key = handle.toLowerCase();
   const found = entries.find(entry => entry.id === key);
   const cleanNote = String(note).trim().slice(0, 160);
   const cleanName = String(displayName).trim().slice(0, 100);
+  const cleanAvatar = normalizeAvatarUrl(avatarUrl);
   if (found) {
-    return { entries: entries.map(entry => entry.id === key ? { ...entry, note: updateNote ? cleanNote : entry.note, displayName: updateNote ? cleanName : (entry.displayName || cleanName) } : entry), duplicate: true, handle: found.handle };
+    return { entries: entries.map(entry => entry.id === key ? { ...entry, note: updateNote ? cleanNote : entry.note, displayName: updateNote ? cleanName : (entry.displayName || cleanName), avatarUrl: cleanAvatar || entry.avatarUrl || '' } : entry), duplicate: true, handle: found.handle };
   }
-  return { entries: [{ id: key, handle, displayName: cleanName, note: cleanNote, createdAt: Date.now() }, ...entries], duplicate: false, handle };
+  return { entries: [{ id: key, handle, displayName: cleanName, avatarUrl: cleanAvatar, note: cleanNote, createdAt: Date.now() }, ...entries], duplicate: false, handle };
+}
+
+// Reading a page may update known people; it must never auto-save strangers.
+export function enrichEntries(entries, profiles) {
+  if (!Array.isArray(profiles) || profiles.length > 500) throw new Error('页面扫描结果格式不正确');
+  const known = new Map(profiles.map(profile => {
+    if (!profile || typeof profile.handle !== 'string' || typeof profile.displayName !== 'string' || typeof profile.avatarUrl !== 'string') throw new Error('页面资料格式不正确');
+    return [normalizeHandle(profile.handle).toLowerCase(), { displayName: profile.displayName.trim().slice(0,100), avatarUrl: normalizeAvatarUrl(profile.avatarUrl) }];
+  }));
+  let updated = 0;
+  const next = entries.map(entry => {
+    const profile = known.get(entry.id); if (!profile) return entry;
+    const displayName = profile.displayName || entry.displayName, avatarUrl = profile.avatarUrl || entry.avatarUrl || '';
+    if (displayName === entry.displayName && avatarUrl === (entry.avatarUrl || '')) return entry;
+    updated++; return { ...entry, displayName, avatarUrl };
+  });
+  return { entries: next, updated };
 }
 
 export function mentions(entries, selected, separator = ' ') {
