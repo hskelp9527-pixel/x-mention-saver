@@ -190,6 +190,41 @@ try {
   await page.locator('[data-xms-panel]').waitFor();
   await page.mouse.click(2, 2);
   await page.locator('[data-xms-panel]').waitFor({ state:'detached' });
+  // Clicking a contact inserts at the bookmarked caret of this composer only.
+  await page.locator('#editor2').scrollIntoViewIfNeeded();
+  await page.evaluate(()=>{
+    const editor=document.querySelector('#editor2');editor.dataset.inputs='0';editor.addEventListener('input',()=>editor.dataset.inputs=String(Number(editor.dataset.inputs)+1));
+    editor.focus();const range=document.createRange();range.setStart(editor.firstChild,2);range.collapse(true);getSelection().removeAllRanges();getSelection().addRange(range);
+  });
+  await page.locator('[data-xms-launcher]').nth(1).click();
+  const insertionPanel=page.frameLocator('iframe[title="记得 @ 收藏"]');
+  await insertionPanel.locator('[aria-label="插入 @new_friend"]').waitFor();
+  const stale=await insertionPanel.locator('body').evaluate(()=>chrome.runtime.sendMessage({type:'insert',ids:['new_friend'],composerToken:'00000000-0000-0000-0000-000000000000'}));
+  assert.equal(stale.ok,false);
+  assert.equal(await page.locator('#editor2').textContent(),'回复草稿');
+  await page.waitForTimeout(150);
+  await page.screenshot({path:join(output,'dropdown-preview.png')});
+  await insertionPanel.locator('[aria-label="插入 @new_friend"]').click();
+  await page.locator('[data-xms-panel]').waitFor({state:'detached'});
+  assert.equal(await page.locator('#editor2').textContent(),'回复 @new_friend 草稿');
+  assert.ok(Number(await page.locator('#editor2').getAttribute('data-inputs'))>0,'native input event reaches controlled editor');
+  assert.equal(await page.locator('#editor2').evaluate(el=>document.activeElement===el),true);
+  assert.equal(await page.locator('#editor').textContent(),'@in_editor');
+  await page.keyboard.press('Control+z');
+  assert.equal(await page.locator('#editor2').textContent(),'回复草稿','insertion is one native undo operation');
+  await page.evaluate(()=>{const editor=document.querySelector('#editor2');editor.focus();const range=document.createRange();range.selectNodeContents(editor);range.collapse(false);getSelection().removeAllRanges();getSelection().addRange(range);});
+  await page.locator('[data-xms-launcher]').nth(1).click();
+  await insertionPanel.locator('[aria-label="选择 @new_friend"]').check();
+  await insertionPanel.locator('[aria-label="选择 @another_user"]').check();
+  await insertionPanel.locator('#insert-selected').click();
+  await page.locator('[data-xms-panel]').waitFor({state:'detached'});
+  assert.equal((await page.locator('#editor2').textContent()).replace(/\u00a0/g,' '),'回复草稿 @new_friend @another_user ');
+  await page.keyboard.press('Control+z');
+  await page.evaluate(()=>{const editor=document.querySelector('#editor2');editor.focus();const range=document.createRange();range.setStart(editor.firstChild,2);range.setEnd(editor.firstChild,4);getSelection().removeAllRanges();getSelection().addRange(range);});
+  await page.locator('[data-xms-launcher]').nth(1).click();
+  await insertionPanel.locator('[aria-label="通过头像插入 @new_friend"]').click();
+  await page.locator('[data-xms-panel]').waitFor({state:'detached'});
+  assert.equal((await page.locator('#editor2').textContent()).replace(/\u00a0/g,' '),'回复 @new_friend ','only selected text is replaced');
   await page.setViewportSize({ width: 1000, height: 740 });
   // Reopening keeps data while resetting the temporary selection.
   await popup.reload();

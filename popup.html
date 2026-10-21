@@ -18,7 +18,7 @@
     </form></details>
     <div class="backup"><span>仅保存在本机</span><button id="export" type="button">导出备份</button><button id="import" type="button">导入</button><input id="import-file" type="file" accept="application/json,.json" hidden></div>
   </main>
-  <footer><div class="copy-top"><span id="selection-count">已选 0 位</span><select id="separator" aria-label="复制格式"><option value="space">空格分隔</option><option value="line">每人一行</option></select></div><button id="copy-selected" class="primary copy" disabled>复制选中的 @用户名</button><p id="status" role="status" aria-live="polite">复制后，粘贴到 X 的正文或回复里。</p></footer>
+  <footer><div class="copy-top"><span id="selection-count">已选 0 位</span><select id="separator" aria-label="插入或复制格式"><option value="space">空格分隔</option><option value="line">每人一行</option></select></div><div class="footer-actions"><button id="insert-selected" class="primary copy" disabled hidden>加入输入框</button><button id="copy-selected" class="primary copy" disabled>复制选中的 @用户名</button></div><p id="status" role="status" aria-live="polite">复制后，粘贴到 X 的正文或回复里。</p></footer>
   <script type="module" src="popup.js"></script>
 </body>
 </html>

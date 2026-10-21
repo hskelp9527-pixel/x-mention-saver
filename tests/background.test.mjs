@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 
 let listener;
 let saved = { entries: [{ handle: 'alice', note: '旧备注', createdAt: 123 }] };
+let insertedMessage;
 globalThis.chrome = {
-  tabs: { query:async()=>[{id:1}],sendMessage:async()=>({profiles:[{handle:'alice',displayName:'扫描昵称',avatarUrl:'https://pbs.twimg.com/profile_images/123/alice.jpg'},{handle:'stranger',displayName:'未保存',avatarUrl:''}]}) },
+  tabs: { query:async()=>[{id:1}],sendMessage:async(tabId,message,options)=>{if(message.type==='xms-insert-mentions'){insertedMessage={tabId,message,options};return {ok:true};}return {profiles:[{handle:'alice',displayName:'扫描昵称',avatarUrl:'https://pbs.twimg.com/profile_images/123/alice.jpg'},{handle:'stranger',displayName:'未保存',avatarUrl:''}]};} },
   runtime: { id: 'extension-id', getURL: path => 'chrome-extension://extension-id/' + path, onMessage: { addListener: fn => { listener = fn; } } },
   storage: { local: { get: async () => structuredClone(saved), set: async data => { saved = structuredClone(data); } } }
 };
@@ -41,4 +42,18 @@ test('scan uses the page tab and enrich never discloses saved collections to con
   assert.equal(enriched.ok,true);assert.equal(enriched.entries,undefined);assert.equal(enriched.profiles,undefined);
   const before=structuredClone(saved);
   assert.equal((await request({type:'import',entries:[{handle:'good'},{handle:'bad',avatarUrl:'https://evil.test/tracker'}]},ui)).ok,false);assert.deepEqual(saved,before);
+});
+
+test('insertion requires embedded UI and sends only explicitly selected handles to its own tab',async()=>{
+  const command={type:'insert',ids:['alice','bob','alice'],composerToken:'12345678-1234-1234-1234-123456789012',separator:'line'};
+  assert.equal((await request(command,content)).ok,false);
+  assert.equal((await request(command,ui)).ok,false);
+  const embedded={...ui,tab:{id:42},frameId:7};
+  insertedMessage=undefined;
+  assert.equal((await request({...command,ids:['alice','missing']},embedded)).ok,false);
+  assert.equal(insertedMessage,undefined);
+  const before=structuredClone(saved),result=await request(command,embedded);
+  assert.equal(result.ok,true);assert.equal(result.inserted,2);assert.equal(result.entries,undefined);
+  assert.deepEqual(insertedMessage,{tabId:42,message:{type:'xms-insert-mentions',composerToken:command.composerToken,handles:['alice','bob'],separator:'\n'},options:{frameId:0}});
+  assert.deepEqual(saved,before);
 });

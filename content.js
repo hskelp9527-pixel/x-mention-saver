@@ -89,15 +89,22 @@
   document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
 })();
 
-// Mount one small launcher in each editor toolbar, outside its editable DOM. No editor
-// text, selection, submit button or X network request is changed.
+// Mount one small launcher in each editor toolbar. Only an explicit contact click
+// inserts mentions into its bound editor; the extension never submits a post.
 (() => {
   const editorSelector = '[contenteditable="true"][data-testid^="tweetTextarea_"],textarea[data-testid^="tweetTextarea_"]';
   const mounted = new Map();
-  let panel, frame, launcher, desiredHeight = 280;
+  let panel, frame, launcher, desiredHeight = 280, composerToken, bookmark;
+  function remember(editor) {
+    if (editor instanceof HTMLTextAreaElement) return {editor,start:editor.selectionStart,end:editor.selectionEnd};
+    const selection=window.getSelection();
+    if(selection?.rangeCount&&editor.contains(selection.getRangeAt(0).commonAncestorContainer))return {editor,range:selection.getRangeAt(0).cloneRange()};
+    return bookmark?.editor===editor?bookmark:{editor};
+  }
   function close(restoreFocus = true) {
     panel?.remove(); panel = null; frame = null;
     launcher?.setAttribute('aria-expanded', 'false');
+    composerToken = null;
     if (restoreFocus && launcher?.isConnected) launcher.focus();
   }
   function fit() {
@@ -114,13 +121,16 @@
   }
   function open(button) {
     if(panel&&launcher===button){close();return;}
-    close(false); launcher = button;desiredHeight=280;launcher.setAttribute('aria-expanded','true');
+    const editor=[...mounted].find(([,record])=>record.button===button)?.[0];
+    if(!editor?.isConnected)return;
+    const savedSelection=remember(editor);
+    close(false); launcher = button;bookmark=savedSelection;composerToken=crypto.randomUUID();desiredHeight=280;launcher.setAttribute('aria-expanded','true');
     panel = document.createElement('div');
     panel.dataset.xmsPanel = '';
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '记得 @ 收藏');
     panel.style.cssText = 'box-sizing:border-box;position:fixed;z-index:2147483646;background:white;border:1px solid #b4d6fa;border-radius:14px;box-shadow:0 8px 40px #0004;overflow:hidden';
     frame = document.createElement('iframe');
-    frame.src = chrome.runtime.getURL('popup.html') + '?parentOrigin=' + encodeURIComponent(location.origin); frame.title = '记得 @ 收藏';
+    frame.src = chrome.runtime.getURL('popup.html') + '?parentOrigin=' + encodeURIComponent(location.origin) + '&composer=' + composerToken; frame.title = '记得 @ 收藏';
     frame.allow = 'clipboard-write';
     frame.style.cssText = 'width:100%;height:100%;border:0;display:block';
     panel.append(frame); document.documentElement.append(panel); fit();
@@ -175,6 +185,7 @@
       button.setAttribute('aria-label', '打开记得 @ 收藏'); button.setAttribute('aria-haspopup', 'dialog');
       button.setAttribute('aria-expanded', 'false');
       button.style.cssText = 'box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:0 0 30px;width:30px;height:30px;min-width:30px;max-height:30px;padding:0;margin:0;border:0;border-radius:50%;background:transparent;color:rgb(29,155,240);font:600 20px/1 system-ui;cursor:pointer;touch-action:manipulation;vertical-align:middle';
+      button.addEventListener('pointerdown', () => { bookmark=remember(editor); });
       button.addEventListener('click', () => open(button));
       let floating = !toolbar;
       if (toolbar) {
@@ -202,7 +213,11 @@
   }).observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener('message', event => {
     if (!frame || event.source !== frame.contentWindow || event.origin !== chrome.runtime.getURL('').replace(/\/$/, '')) return;
-    if(event.data?.type==='xms-close-panel')close();
+    if(event.data?.type==='xms-close-panel'){
+      // Let the native key/click finish before destroying its originating iframe.
+      const closingFrame=frame,restoreFocus=event.data.inserted!==true;
+      setTimeout(()=>{if(frame===closingFrame)close(restoreFocus);},60);
+    }
     else if(event.data?.type==='xms-panel-size'&&Number.isFinite(event.data.height)){
       const next=Math.max(180,Math.min(400,event.data.height));if(Math.abs(next-desiredHeight)>1){desiredHeight=next;fit();}
     }
@@ -214,6 +229,35 @@
   window.visualViewport?.addEventListener('scroll', reposition);
   window.addEventListener('resize', reposition);
   document.addEventListener('scroll', reposition, true);
+  chrome.runtime.onMessage.addListener((message,sender,respond)=>{
+    if(sender.id!==chrome.runtime.id||message?.type!=='xms-insert-mentions')return;
+    try{
+      const editor=bookmark?.editor;
+      if(!panel||message.composerToken!==composerToken||!editor?.isConnected||![...mounted].some(([node,record])=>node===editor&&record.button===launcher))throw new Error('原输入框已关闭，请从需要填写的输入框重新打开 @');
+      if(editor instanceof HTMLTextAreaElement?(editor.disabled||editor.readOnly):!editor.isContentEditable)throw new Error('此输入框暂时无法编辑，请使用复制');
+      if(!Array.isArray(message.handles)||!message.handles.length||message.handles.length>100||message.handles.some(handle=>typeof handle!=='string'||! /^[A-Za-z0-9_]{1,15}$/.test(handle)))throw new Error('用户名格式不正确');
+      const separator=message.separator==='\n'?'\n':' ',mentions=message.handles.map(handle=>'@'+handle).join(separator);
+      editor.focus();
+      if(document.activeElement!==editor&&!editor.contains(document.activeElement))throw new Error('无法定位原输入框，请重新打开 @');
+      let before,after,range;
+      if(editor instanceof HTMLTextAreaElement){before=editor.value.slice(0,bookmark.start);after=editor.value.slice(bookmark.end);}
+      else{
+        range=bookmark.range;
+        if(!range||!editor.contains(range.commonAncestorContainer)){range=document.createRange();range.selectNodeContents(editor);range.collapse(false);}
+        const left=range.cloneRange();left.selectNodeContents(editor);left.setEnd(range.startContainer,range.startOffset);before=left.toString();
+        const right=range.cloneRange();right.selectNodeContents(editor);right.setStart(range.endContainer,range.endOffset);after=right.toString();
+        const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+      }
+      const text=(before&&!/\s$/.test(before)?separator:'')+mentions+(!after||!/^\s/.test(after)?separator:'');
+      if(editor instanceof HTMLTextAreaElement){
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(editor,before+text+after);
+        editor.setSelectionRange(before.length+text.length,before.length+text.length);
+        editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));
+      }else if(!document.execCommand('insertText',false,text))throw new Error('此输入框暂不支持直接加入，请使用复制');
+      bookmark=remember(editor);respond({ok:true});
+    }catch(error){respond({ok:false,error:error.message});}
+    return false;
+  });
   mount();
 })();
 

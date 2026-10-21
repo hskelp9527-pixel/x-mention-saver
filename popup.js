@@ -5,6 +5,9 @@ const selected = new Set();
 let editing = false;
 let pageProfiles = [];
 let candidateSignature = '';
+const composerToken=new URLSearchParams(location.search).get('composer');
+const canInsert=window.parent!==window&&/^[a-f0-9-]{36}$/i.test(composerToken||'');
+let inserting=false;
 function parentOrigin(){try{const origin=new URLSearchParams(location.search).get('parentOrigin')||new URL(document.referrer).origin;return /^https:\/\/(www\.)?(x|twitter)\.com$/.test(origin)?origin:null;}catch{return null;}}
 function notifySize(){if(window.parent===window)return;requestAnimationFrame(()=>{const main=document.querySelector('main'),children=[...main.children].filter(e=>e.getClientRects().length),top=main.getBoundingClientRect().top,bottom=Math.max(top,...children.map(e=>e.getBoundingClientRect().bottom));const height=Math.ceil(document.querySelector('header').offsetHeight+document.querySelector('footer').offsetHeight+bottom-top+main.scrollTop+4),origin=parentOrigin();if(origin)window.parent.postMessage({type:'xms-panel-size',height},origin);});}
 function status(text, error = false) { $('status').textContent = text; $('status').classList.toggle('error', error); }
@@ -20,9 +23,12 @@ function filtered() {
 function updateSelection() {
   $('selection-count').textContent = `已选 ${selected.size} 位`;
   $('copy-selected').disabled = selected.size === 0;
+  $('insert-selected').disabled = selected.size === 0;
+  document.querySelector('footer').classList.toggle('has-selection',selected.size>0);
   const visible = filtered();
   $('select-all').textContent = visible.length && visible.every(entry => selected.has(entry.id)) ? '取消选择当前结果' : '全选当前结果';
   $('select-all').disabled = !visible.length;
+  notifySize();
 }
 function resetForm() {
   editing = false; $('add-form').reset(); $('handle').disabled = false;
@@ -51,7 +57,10 @@ function render() {
       if (check.checked) selected.add(entry.id); else selected.delete(entry.id);
       row.classList.toggle('selected', check.checked); updateSelection();
     });
-    const info = document.createElement('label'); info.className = 'person-info'; info.htmlFor = check.id;
+    const info = document.createElement(canInsert?'button':'label'); info.className = 'person-info';
+    if(canInsert){info.type='button';info.title='点击加入输入框';info.setAttribute('aria-label','插入 @'+entry.handle);info.addEventListener('click',()=>insertPeople([entry.id]));}
+    else info.htmlFor = check.id;
+    check.setAttribute('aria-label','选择 @'+entry.handle);
     const name = document.createElement('strong'); name.textContent = entry.displayName || '@' + entry.handle;
     const handle = document.createElement('small');handle.textContent='@'+entry.handle;
     const note = document.createElement('small'); note.textContent = entry.note; note.title = entry.note;note.hidden=!entry.note;
@@ -77,7 +86,9 @@ function render() {
       if (text === '×') button.className = 'remove';
       button.addEventListener('click', action); actions.append(button);
     }
-    row.append(check, avatar(entry), info, actions); $('list').append(row);
+    let picture=avatar(entry);
+    if(canInsert){const button=document.createElement('button');button.type='button';button.className='avatar-insert';button.title='加入 @'+entry.handle;button.setAttribute('aria-label','通过头像插入 @'+entry.handle);button.append(picture);button.addEventListener('click',()=>insertPeople([entry.id]));picture=button;}
+    row.append(check, picture, info, actions); $('list').append(row);
   }
   updateSelection();
   renderCandidates();
@@ -119,6 +130,15 @@ async function copy(text, message) {
     finally { field.remove(); }
   }
 }
+async function insertPeople(ids){
+  if(inserting)return;
+  inserting=true;
+  try{
+    await request({type:'insert',ids,composerToken,separator:$('separator').value});
+    const origin=parentOrigin();if(origin)window.parent.postMessage({type:'xms-close-panel',inserted:true},origin);
+  }catch(error){status(error.message,true);}
+  finally{inserting=false;}
+}
 $('add-form').addEventListener('submit', async event => {
   event.preventDefault(); $('save').disabled = true;
   try {
@@ -136,6 +156,7 @@ $('select-all').addEventListener('click', () => {
   render();
 });
 $('copy-selected').addEventListener('click', () => copy(copyMentions(entries, selected, $('separator').value === 'line' ? '\n' : ' '), `已复制 ${selected.size} 个 @用户名`));
+$('insert-selected').addEventListener('click',()=>insertPeople([...selected]));
 $('export').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify({ version: 3, entries }, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob); const link = document.createElement('a');
@@ -170,4 +191,5 @@ if (window.parent !== window) {
   document.addEventListener('keydown', event => { if (event.key === 'Escape') closePanel(); });
   notifySize();
 }
+if(canInsert){document.body.classList.add('direct-insert');$('insert-selected').hidden=false;$('copy-selected').textContent='复制';$('copy-selected').classList.remove('primary','copy');status('点头像或昵称直接加入，多选后可一起加入。');notifySize();}
 scanPage(true);

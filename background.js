@@ -3,7 +3,7 @@ import { mergeEntry, migrateEntries, enrichEntries } from './model.js';
 // One queue owns storage writes across popups and all X tabs.
 let queue = Promise.resolve();
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (!['list', 'save', 'remove', 'import', 'enrich', 'scan'].includes(message?.type)) return;
+  if (!['list', 'save', 'remove', 'import', 'enrich', 'scan', 'insert'].includes(message?.type)) return;
   const extensionOrigin = chrome.runtime.getURL('');
   const trustedUI = sender.id === chrome.runtime.id && sender.url?.startsWith(extensionOrigin) && new URL(sender.url).pathname === '/popup.html';
   let trustedContent = false;
@@ -20,7 +20,15 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     const data = await chrome.storage.local.get({ entries: [] });
     let entries = migrateEntries(data.entries);
     let result = {};
-    if (message.type === 'save') {
+    if (message.type === 'insert') {
+      if (!sender.tab || !(sender.frameId > 0) || !/^[a-f0-9-]{36}$/i.test(message.composerToken || '')) throw new Error('请从 X 输入框旁的小 @ 打开名单后插入');
+      if (!Array.isArray(message.ids) || !message.ids.length || message.ids.length > 100) throw new Error('请选择 1–100 位联系人');
+      const people = [...new Set(message.ids)].map(id => entries.find(entry => entry.id === id));
+      if (people.some(person => !person)) throw new Error('联系人已变化，请重新打开名单');
+      const response = await chrome.tabs.sendMessage(sender.tab.id, { type:'xms-insert-mentions', composerToken:message.composerToken, handles:people.map(person=>person.handle), separator:message.separator==='line'?'\n':' ' }, {frameId:0});
+      if (!response?.ok) throw new Error(response?.error || '输入框不可用，请重新从输入框旁的小 @ 打开名单');
+      return {ok:true, inserted:people.length};
+    } else if (message.type === 'save') {
       result = mergeEntry(entries, message.handle, message.note, trustedUI, message.displayName, message.avatarUrl);
       entries = result.entries;
     } else if (message.type === 'remove') {
