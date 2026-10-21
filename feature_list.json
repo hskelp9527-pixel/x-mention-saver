@@ -1,0 +1,44 @@
+{
+  "version": "1.1.0",
+  "features": [
+    {
+      "id": "display-name-migration",
+      "implemented": true,
+      "verification": "pending-primary-agent"
+    },
+    {
+      "id": "composer-collection-panel",
+      "implemented": true,
+      "verification": "pending-primary-agent"
+    },
+    {
+      "id": "safe-copy-boundaries",
+      "implemented": true,
+      "verification": "pending-primary-agent"
+    },
+    {
+      "id": "local-backup-v2",
+      "implemented": true,
+      "verification": "pending-primary-agent"
+    },
+    {
+      "id": "responsive-touch-ui",
+      "implemented": true,
+      "verification": "pending-primary-agent"
+    },
+    {
+      "id": "firefox-package",
+      "implemented": true,
+      "verification": "pending-primary-agent"
+    },
+    {
+      "id": "release-workflow",
+      "implemented": true,
+      "verification": "pending-primary-agent"
+    }
+  ],
+  "deviceValidation": {
+    "firefoxAndroid": "not-run",
+    "safariIOS": "conversion-source-only"
+  }
+}

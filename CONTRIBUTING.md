@@ -4,4 +4,4 @@
 
 提交改动前运行 `npm ci` 和 `npm test`。涉及弹窗或选中保存的改动，还需要运行 `npm run test:browser`，并在 X 页面手动检查显示位置。插件无需构建；避免添加与功能无关的权限和运行时依赖。
 
-请让每个 PR 聚焦一个问题，说明用户能看到的变化、验证方式和已知限制。插件运行文件变化时同步更新 `manifest.json` 与 `package.json` 版本，并在 `CHANGELOG.md` 记录变更。发布前运行 `python scripts/package.py`。
+请让每个 PR 聚焦一个问题，说明用户能看到的变化、验证方式和已知限制。插件运行文件变化时同步更新 `manifest.json` 与 `package.json` 版本，并在 `CHANGELOG.md` 记录变更。发布前运行 `npm run check:firefox` 与 `python scripts/package.py`。1.1.0 同时维护 `manifest.firefox.json`、`progress.md` 和 `feature_list.json`。Firefox Android 尚待真机与 Mozilla 签名验证，Safari 只提供可转换源，不能把源码包描述为可安装手机扩展。Checks 与 tag Release 均实际运行 Chromium 浏览器测试。

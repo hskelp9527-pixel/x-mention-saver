@@ -39,10 +39,10 @@ try {
   await popup.locator('#select-all').click();
   await popup.locator('#copy-selected').click();
   await popup.waitForFunction(() => document.querySelector('#status').textContent.includes('已复制 2'));
-  assert.equal(await popup.evaluate(() => navigator.clipboard.readText()), '@another_user @brucejinji711');
+  assert.equal(await popup.evaluate(() => navigator.clipboard.readText()), ' @another_user @brucejinji711 ');
   await popup.locator('#separator').selectOption('line');
   await popup.locator('#copy-selected').click();
-  assert.equal((await popup.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'), '@another_user\n@brucejinji711');
+  assert.equal((await popup.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'), '\n@another_user\n@brucejinji711\n');
   console.log('Verified clipboard and CRUD');
   await popup.locator('#search').fill('长文');
   assert.equal(await popup.locator('.person').count(), 1);
@@ -55,7 +55,7 @@ try {
 
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
-  await context.route('https://x.com/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>选中保存演示</title></head><body style="font:20px system-ui;padding:120px 80px"><h2>模拟 X 页面 · 选中用户名即可收藏</h2><span id="handle">@BruceJinji711</span><p id="new">@new_friend</p><p id="invalid">普通文字</p><p id="email">person@example.com</p><p id="multi">@alice @bob</p><p id="long">@abcdefghijklmnop</p><p id="right" style="position:fixed;right:8px;top:25px">@near_edge</p><div contenteditable="true" id="editor">@in_editor</div></body></html>` }));
+  await context.route('https://x.com/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>选中保存演示</title></head><body style="font:20px system-ui;padding:120px 80px"><h2>模拟 X 页面 · 选中用户名即可收藏</h2><span id="handle">@BruceJinji711</span><div data-testid="User-Name"><a href="/new_friend"><span dir="auto">新朋友</span></a><a href="/new_friend"><span id="new">@new_friend</span></a></div><p id="invalid">普通文字</p><p id="email">person@example.com</p><p id="multi">@alice @bob</p><p id="long">@abcdefghijklmnop</p><p id="right" style="position:fixed;right:8px;top:25px">@near_edge</p><div contenteditable="true" id="editor" data-testid="tweetTextarea_0">@in_editor</div><div contenteditable="true" id="editor2" data-testid="tweetTextarea_1">回复草稿</div></body></html>` }));
   await page.goto('https://x.com/home');
   assert.equal(await page.evaluate(() => document.characterSet), 'UTF-8');
   assert.equal(await page.locator('h2').textContent(), '模拟 X 页面 · 选中用户名即可收藏');
@@ -106,10 +106,28 @@ try {
   await popup.locator('#search').fill('');
   const popupHeight = await popup.evaluate(() => document.body.getBoundingClientRect().height);
   await popup.screenshot({ path: join(output, 'popup-preview.png'), clip: { x: 0, y: 0, width: 390, height: popupHeight } });
+  // Each editor gets its own launcher. The panel is extension-origin and never edits a draft.
+  assert.equal(await page.locator('[data-xms-launcher]').count(), 2);
+  assert.equal((await worker.evaluate(() => chrome.storage.local.get('entries'))).entries.find(entry => entry.id === 'new_friend').displayName, '新朋友');
+  await page.setViewportSize({ width: 320, height: 500 });
+  await page.locator('[data-xms-launcher]').nth(1).click();
+  const savedPanel = page.frameLocator('iframe[title="记得 @ 收藏"]');
+  await savedPanel.locator('#search').fill('新朋友');
+  assert.equal(await savedPanel.locator('.person').count(), 1);
+  assert.equal(await page.locator('#editor2').textContent(), '回复草稿');
+  const panelBounds = await page.locator('[data-xms-panel]').boundingBox();
+  assert.ok(panelBounds.x >= 0 && panelBounds.width <= 320 && panelBounds.height <= 500);
+  await savedPanel.locator('#search').press('Escape');
+  await page.locator('[data-xms-panel]').waitFor({ state: 'detached' });
+  assert.equal(await page.locator('[data-xms-launcher]').nth(1).evaluate(el => el === document.activeElement), true);
+  await page.setViewportSize({ width: 1000, height: 740 });
   // Reopening keeps data while resetting the temporary selection.
   await popup.reload();
   await popup.waitForFunction(() => document.querySelector('#count').textContent === '3 位');
   assert.equal(await popup.locator('#selection-count').textContent(), '已选 0 位');
+  // Backup names are validated atomically, and the extension does not accept page-origin messages.
+  const wrongName = await popup.evaluate(() => chrome.runtime.sendMessage({ type: 'import', entries: [{ handle: 'safe' }, { handle: 'bad', displayName: 7 }] }));
+  assert.equal(wrongName.ok, false);
   const before = (await worker.evaluate(() => chrome.storage.local.get('entries'))).entries;
   const invalidImport = await popup.evaluate(() => chrome.runtime.sendMessage({ type: 'import', entries: [{ handle: 'valid_one' }, { handle: 'bad handle' }] }));
   assert.equal(invalidImport.ok, false);

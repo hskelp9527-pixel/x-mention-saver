@@ -1,4 +1,4 @@
-import { mentions } from './model.js';
+import { copyMentions } from './model.js';
 const $ = id => document.getElementById(id);
 let entries = [];
 const selected = new Set();
@@ -11,7 +11,7 @@ async function request(message) {
 }
 function filtered() {
   const query = $('search').value.trim().toLowerCase();
-  return entries.filter(entry => ('@' + entry.handle + ' ' + entry.note).toLowerCase().includes(query));
+  return entries.filter(entry => ('@' + entry.handle + ' ' + entry.displayName + ' ' + entry.note).toLowerCase().includes(query));
 }
 function updateSelection() {
   $('selection-count').textContent = `已选 ${selected.size} 位`;
@@ -42,15 +42,16 @@ function render() {
       row.classList.toggle('selected', check.checked); updateSelection();
     });
     const info = document.createElement('label'); info.className = 'person-info'; info.htmlFor = check.id;
-    const name = document.createElement('strong'); name.textContent = '@' + entry.handle;
+    const name = document.createElement('strong'); name.textContent = entry.displayName ? entry.displayName + ' · @' + entry.handle : '@' + entry.handle;
     const note = document.createElement('small'); note.textContent = entry.note || '尚未添加备注'; note.title = entry.note;
     info.append(name, note);
     const actions = document.createElement('div'); actions.className = 'actions';
     for (const [text, label, action] of [
-      ['复制', '复制 @' + entry.handle, () => copy('@' + entry.handle, '已复制 @' + entry.handle)],
+      ['复制', '复制 @' + entry.handle, () => copy(copyMentions([entry], new Set([entry.id])), '已复制 @' + entry.handle)],
+      ['昵称', '复制显示昵称 ' + (entry.displayName || '未填写'), () => entry.displayName ? copy(entry.displayName, '已复制显示昵称') : status('请先编辑补充显示昵称', true)],
       ['✎', '编辑 @' + entry.handle + ' 的备注', () => {
         editing = true; $('handle').value = '@' + entry.handle; $('handle').disabled = true;
-        $('note').value = entry.note; $('save').textContent = '保存'; $('cancel-edit').hidden = false; $('note').focus();
+        $('display-name').value = entry.displayName || ''; $('note').value = entry.note; $('save').textContent = '保存'; $('cancel-edit').hidden = false; $('note').focus();
       }],
       ['×', '删除 @' + entry.handle, async () => {
         try { entries = (await request({ type: 'remove', id: entry.id })).entries; render();
@@ -70,12 +71,20 @@ function render() {
 }
 async function copy(text, message) {
   try { await navigator.clipboard.writeText(text); status(message); }
-  catch { status('复制失败，请重新点击复制按钮', true); }
+  catch {
+    // Some mobile browsers restrict async clipboard APIs in embedded frames.
+    const field = document.createElement('textarea'); field.value = text;
+    field.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+    document.body.append(field); field.select();
+    try { if (!document.execCommand('copy')) throw new Error('copy'); status(message); }
+    catch { status('复制失败，请从浏览器工具栏打开插件后重试', true); }
+    finally { field.remove(); }
+  }
 }
 $('add-form').addEventListener('submit', async event => {
   event.preventDefault(); $('save').disabled = true;
   try {
-    const result = await request({ type: 'save', handle: $('handle').value, note: $('note').value });
+    const result = await request({ type: 'save', handle: $('handle').value, note: $('note').value, displayName: $('display-name').value });
     entries = result.entries; status(editing ? '备注已保存' : result.duplicate ? '已在收藏中，备注已更新' : '已收藏 @' + result.handle);
     resetForm(); render();
   } catch (error) { status(error.message, true); }
@@ -88,9 +97,9 @@ $('select-all').addEventListener('click', () => {
   for (const entry of visible) { if (all) selected.delete(entry.id); else selected.add(entry.id); }
   render();
 });
-$('copy-selected').addEventListener('click', () => copy(mentions(entries, selected, $('separator').value === 'line' ? '\n' : ' '), `已复制 ${selected.size} 个 @用户名`));
+$('copy-selected').addEventListener('click', () => copy(copyMentions(entries, selected, $('separator').value === 'line' ? '\n' : ' '), `已复制 ${selected.size} 个 @用户名`));
 $('export').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify({ version: 1, entries }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ version: 2, entries }, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob); const link = document.createElement('a');
   link.href = url; link.download = 'x-mentions-backup.json'; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000); status('备份已导出');
@@ -111,3 +120,17 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 try { entries = (await request({ type: 'list' })).entries; render(); }
 catch (error) { status(error.message, true); }
+
+// The embedding page receives only a close signal, never saved people or notes.
+if (window.parent !== window) {
+  document.body.classList.add('embedded');
+  $('close-panel').hidden = false;
+  const closePanel = () => {
+    try {
+      const origin = new URL(document.referrer).origin;
+      if (/^https:\/\/(www\.)?(x|twitter)\.com$/.test(origin)) window.parent.postMessage({ type: 'xms-close-panel' }, origin);
+    } catch {}
+  };
+  $('close-panel').addEventListener('click', closePanel);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closePanel(); });
+}

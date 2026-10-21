@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeHandle, selectionPattern, mergeEntry, mentions } from '../model.js';
+import { normalizeHandle, selectionPattern, mergeEntry, mentions, copyMentions, migrateEntries } from '../model.js';
 
 test('selection requires one @ handle; manual input also accepts profiles', () => {
   for (const value of ['@brucejinji711', '@a', '@a_B12']) assert.ok(selectionPattern.test(value));
@@ -24,4 +24,25 @@ test('case-insensitive duplicate saves preserve notes and batch copy includes @'
   assert.equal(mentions(all, selected), '@another_user @BruceJinji711');
   assert.equal(mentions(all, selected, '\n'), '@another_user\n@BruceJinji711');
   assert.equal(mentions(all, new Set()), '');
+});
+
+
+test('legacy migration keeps identity, timestamps and notes; display names are explicit', () => {
+  const old = migrateEntries([{ id: 'bad', handle: 'Alice', note: '保留', createdAt: 42 }]);
+  assert.deepEqual(old, [{ id: 'alice', handle: 'Alice', note: '保留', createdAt: 42, displayName: '' }]);
+  const named = mergeEntry(old, 'alice', '', false, '爱丽丝').entries;
+  assert.equal(named[0].note, '保留'); assert.equal(named[0].displayName, '爱丽丝');
+  assert.equal(mergeEntry(named, 'ALICE', '', false, '页面新名称').entries[0].displayName, '爱丽丝');
+  assert.equal(mergeEntry(named, 'alice', '新备注', true, '手动名').entries[0].displayName, '手动名');
+  assert.throws(() => migrateEntries([{ handle: 'alice', displayName: {} }]));
+});
+
+test('clipboard mentions force safe separation and outer text boundaries', () => {
+  const entries = migrateEntries([{ handle: 'alice' }, { handle: 'bob' }]);
+  const selected = new Set(['alice', 'bob']);
+  assert.equal(copyMentions(entries, selected, ''), ' @alice @bob ');
+  assert.equal(copyMentions(entries, selected, ', '), ' @alice @bob ');
+  assert.equal(copyMentions(entries, selected, '\n'), '\n@alice\n@bob\n');
+  assert.equal(copyMentions(entries, new Set()), '');
+  assert.equal('正文' + copyMentions(entries, selected) + '继续', '正文 @alice @bob 继续');
 });

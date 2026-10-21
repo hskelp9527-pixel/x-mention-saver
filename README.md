@@ -2,7 +2,7 @@
 
 **有人说「写长文记得 @ 我」，下次却想不起用户名？把他们留在这里。**
 
-一个轻量的 Chrome / Edge 插件：在 X 上选中 `@用户名`，点旁边的「保存」；发帖时勾选想 @ 的人，一次复制，直接粘贴。
+一个轻量的 Chrome / Edge 与 Firefox 插件：在 X 上选中 `@用户名`，点旁边的「保存」；发帖时勾选想 @ 的人，一次复制，直接粘贴。
 
 [下载安装包](https://github.com/hskelp9527-pixel/x-mention-saver/releases/latest) · [反馈问题](https://github.com/hskelp9527-pixel/x-mention-saver/issues/new/choose) · [English](#english)
 
@@ -16,7 +16,7 @@
 
 ![选中用户名后显示保存按钮](docs/images/selection-preview-utf8.png)
 
-搜索、备注、勾选，然后一键复制成 `@alice @bob`。
+同时保存显示昵称、@ID 和备注；搜索、勾选，然后一键复制成 ` @alice @bob `（前后保留空白）。
 
 <img src="docs/images/popup-preview-utf8.png" width="390" alt="收藏列表和批量复制弹窗">
 
@@ -30,7 +30,7 @@
 
 ## 安装，三步即可
 
-目前通过开发者模式安装，尚未上架 Chrome Web Store 或 Edge Add-ons。Windows 和 macOS 上的 Chrome、Edge 都能用（Safari 不支持）。
+目前通过开发者模式安装，尚未上架 Chrome Web Store 或 Edge Add-ons。Windows 和 macOS 上的 Chrome、Edge 都能用。手机平台说明见下方。
 
 1. 在 [Releases](https://github.com/hskelp9527-pixel/x-mention-saver/releases/latest) 下载 **x-mention-saver.zip**，解压到一个准备长期保留的文件夹。
 2. Chrome 地址栏打开 `chrome://extensions`，Edge 打开 `edge://extensions`，开启「开发者模式」。
@@ -54,7 +54,7 @@
 
 ## 识别与隐私
 
-选中文字去掉首尾空白后，必须完整匹配 `^@[A-Za-z0-9_]{1,15}$`。普通文字、中文昵称、邮箱、多个用户名、包含空格或标点的内容都不会触发；发帖编辑框与输入框内不显示保存按钮。短用户名也允许，以兼容已有账号。只检查格式，不联网验证账号是否存在。
+选中文字去掉首尾空白后，必须完整匹配 `^@[A-Za-z0-9_]{1,15}$`。普通文字、单独选中的中文昵称、邮箱、多个用户名、包含空格或标点的内容都不会触发；发帖编辑框与输入框内不显示保存按钮。短用户名也允许，以兼容已有账号。只检查格式，不联网验证账号是否存在。
 
 收藏仅存于当前浏览器的 `chrome.storage.local`。没有云同步或统计服务，不调用 X API，不自动发帖。权限为 `storage` 与 `clipboardWrite`；内容脚本仅在 X / Twitter 网站运行。所有运行代码都包含在仓库里，没有第三方运行时依赖。
 
@@ -92,3 +92,24 @@ Download **x-mention-saver.zip** from [Releases](https://github.com/hskelp9527-p
 Batch copies contain spaces by default. X may not notify accounts mentioned after the first 280 characters of a long post, and recipient notification filters can also apply. This tool copies handles; it does not guarantee notification delivery.
 
 MIT licensed. Independent project, not affiliated with X Corp.
+
+
+## 1.1.0：手机与编辑框入口
+
+Windows Chrome / Edge 使用 `x-mention-saver.zip`。在 X 发帖或回复编辑框旁点击「@ 记得」打开收藏面板；支持搜索昵称、@ID、备注，多选复制，单独复制 @ID 或显示昵称。点击「关闭」或按 Escape 返回原入口。面板使用扩展来源 iframe，收藏不会通过页面消息返回给 X；不会修改草稿或自动发帖。
+
+选中 @ID 保存时，只有同一 X User-Name / UserCell / UserName 区块能明确对应昵称才填写；无法确认时保留为空，可在面板中手动编辑。旧收藏自动迁移，备注、ID 和原时间保留；旧 JSON 继续可导入，新导出格式为 v2。页面重复保存不覆盖手动昵称或备注。复制 @ID 时强制空格/换行分隔，并在整段前后保留空白，避免与相邻正文挤在一起；显示昵称不是可用的 @ 提及。
+
+| 平台 | 使用方式与状态 |
+| --- | --- |
+| Windows Chrome / Edge | 原开发者模式安装方式；浏览器自动化测试使用模拟 X 页面 |
+| Android Firefox 128+ | 使用 Firefox 专用清单与经典 background scripts；尚待 Android 真机验证 |
+| Android Chrome、iPhone Chrome | 不运行本扩展，请改用支持扩展的浏览器 |
+| iPhone Safari | 仅提供可转换 WebExtension 源码，需 macOS / Xcode 转换、签名、设备测试和分发；当前没有可直接安装的 iPhone 包 |
+| X App | 无法加载浏览器扩展，需在浏览器打开 X |
+
+Firefox 桌面开发时解压 `x-mention-saver-firefox-unsigned.zip`，在 `about:debugging` 加载临时附加组件。Android 稳定版通常需要 Mozilla 签名和可安装的分发入口；**unsigned ZIP 不是已签名 XPI，不能直接宣称可在手机安装**。上架或自分发签名后再做真机验收。Safari 源码包可用 Apple 官方 `xcrun safari-web-extension-converter <源码目录>` 在 Mac 转换；本仓库未执行转换或签名。
+
+所有收藏仅在当前浏览器本机保存，不自动跨设备同步。重新读取当前 X 用户区块可补充昵称；需要搬迁完整收藏时使用 JSON 导入/导出。面板在小屏和软键盘出现后按可见视口调整；Android 与 iPhone 设备验收仍待执行。
+
+开发检查新增 `npm run check:firefox`（仅静态）。`python scripts/package.py` 生成 Chromium、Firefox unsigned、Safari source 三份 ZIP。Checks 和 tag Release 工作流都会安装 Chromium 并实际运行浏览器测试；发布 tag 必须与 package/manifest 版本相同。Release 工作流上传这三份资产，不执行商店签名或发布。
