@@ -1,32 +1,56 @@
-import { mergeEntry } from './model.js';
+import { mergeEntry, migrateEntries, enrichEntries } from './model.js';
 
-// All writes run here in order, including requests from multiple X tabs.
+// One queue owns storage writes across popups and all X tabs.
 let queue = Promise.resolve();
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (!['list', 'save', 'remove', 'import'].includes(message?.type)) return;
-  // Page scripts can only request an individual save through the content script.
-  const fromPage = Boolean(sender.tab) && !sender.url?.startsWith(chrome.runtime.getURL(''));
-  if (fromPage && message.type !== 'save') return;
+  if (!['list', 'save', 'remove', 'import', 'enrich', 'scan', 'insert'].includes(message?.type)) return;
+  const extensionOrigin = chrome.runtime.getURL('');
+  const trustedUI = sender.id === chrome.runtime.id && sender.url?.startsWith(extensionOrigin) && new URL(sender.url).pathname === '/popup.html';
+  let trustedContent = false;
+  try {
+    const url = new URL(sender.url);
+    trustedContent = sender.id === chrome.runtime.id && Boolean(sender.tab) && sender.frameId === 0 && url.protocol === 'https:' && ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'].includes(url.hostname);
+  } catch {}
+  // Only our isolated content script may save. The collection is only sent to
+  // our extension-origin UI, including the iframe; never to X's MAIN world.
+  if (!trustedUI && !(trustedContent && ['save', 'enrich'].includes(message.type))) {
+    respond({ ok: false, error: '不允许的请求来源' }); return false;
+  }
   const work = queue.then(async () => {
     const data = await chrome.storage.local.get({ entries: [] });
-    let entries = data.entries;
-    if (!Array.isArray(entries)) throw new Error('收藏数据无法读取，请先导出备份');
+    let entries = migrateEntries(data.entries);
     let result = {};
-    if (message.type === 'save') {
-      result = mergeEntry(entries, message.handle, message.note, !fromPage);
+    if (message.type === 'insert') {
+      if (!sender.tab || !(sender.frameId > 0) || !/^[a-f0-9-]{36}$/i.test(message.composerToken || '')) throw new Error('请从 X 输入框旁的小 @ 打开名单后插入');
+      if (!Array.isArray(message.ids) || !message.ids.length || message.ids.length > 100) throw new Error('请选择 1–100 位联系人');
+      const people = [...new Set(message.ids)].map(id => entries.find(entry => entry.id === id));
+      if (people.some(person => !person)) throw new Error('联系人已变化，请重新打开名单');
+      const response = await chrome.tabs.sendMessage(sender.tab.id, { type:'xms-insert-mentions', composerToken:message.composerToken, handles:people.map(person=>person.handle), separator:message.separator==='line'?'\n':' ' }, {frameId:0});
+      if (!response?.ok) throw new Error(response?.error || '输入框不可用，请重新从输入框旁的小 @ 打开名单');
+      return {ok:true, inserted:people.length};
+    } else if (message.type === 'save') {
+      result = mergeEntry(entries, message.handle, message.note, trustedUI, message.displayName, message.avatarUrl);
       entries = result.entries;
     } else if (message.type === 'remove') {
       entries = entries.filter(entry => entry.id !== message.id);
     } else if (message.type === 'import') {
       if (!Array.isArray(message.entries) || message.entries.length > 5000) throw new Error('备份格式不正确或超过 5000 条');
-      // Validate the whole backup before committing any changes.
-      for (const entry of message.entries.slice().reverse()) {
-        if (!entry || typeof entry.handle !== 'string' || (entry.note !== undefined && typeof entry.note !== 'string')) throw new Error('备份中有无效条目');
-        entries = mergeEntry(entries, entry.handle, entry.note).entries;
+      const imported = migrateEntries(message.entries); // Validate all before mutation.
+      for (const entry of imported.slice().reverse()) entries = mergeEntry(entries, entry.handle, entry.note, false, entry.displayName, entry.avatarUrl).entries;
+    } else if (message.type === 'enrich' || message.type === 'scan') {
+      let profiles = message.profiles;
+      if (message.type === 'scan') {
+        const tabId = sender.tab?.id ?? (await chrome.tabs.query({ active:true, currentWindow:true }))[0]?.id;
+        if (tabId === undefined) throw new Error('请在 X 页面打开名单后扫描');
+        try { profiles = (await chrome.tabs.sendMessage(tabId, { type:'xms-scan-profiles' }, { frameId:0 }))?.profiles; }
+        catch { throw new Error('请先刷新 X 页面，再扫描当前已加载的用户'); }
       }
+      result = enrichEntries(entries, profiles); entries = result.entries;
+      if (trustedUI) result.profiles = profiles;
     }
-    if (message.type !== 'list') await chrome.storage.local.set({ entries });
-    return { ok: true, ...result, entries };
+    if (JSON.stringify(data.entries) !== JSON.stringify(entries)) await chrome.storage.local.set({ entries });
+    const { profiles, updated } = result;
+    return { ok: true, duplicate: result.duplicate, handle: result.handle, updated, profiles: trustedUI ? profiles : undefined, entries: trustedUI ? entries : undefined };
   });
   queue = work.catch(() => {});
   work.then(respond, error => respond({ ok: false, error: error.message }));

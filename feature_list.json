@@ -1,0 +1,60 @@
+{
+  "version": "1.3.0",
+  "features": [
+    {
+      "id": "display-name-migration",
+      "implemented": true,
+      "verification": "desktop-passed"
+    },
+    {
+      "id": "composer-collection-panel",
+      "implemented": true,
+      "verification": "desktop-passed"
+    },
+    {
+      "id": "safe-copy-boundaries",
+      "implemented": true,
+      "verification": "desktop-passed"
+    },
+    {
+      "id": "local-backup-v3",
+      "implemented": true,
+      "verification": "desktop-passed"
+    },
+    {
+      "id": "responsive-touch-ui",
+      "implemented": true,
+      "verification": "desktop-passed; device-not-tested"
+    },
+    {
+      "id": "firefox-package",
+      "implemented": true,
+      "verification": "desktop-passed; device-not-tested"
+    },
+    {
+      "id": "release-workflow",
+      "implemented": true,
+      "verification": "desktop-passed"
+    },
+    {
+      "id": "avatar-profile-dom-scan",
+      "implemented": true,
+      "verification": "desktop-passed"
+    },
+    {
+      "id": "collapsed-anchored-dropdown",
+      "implemented": true,
+      "verification": "desktop-passed"
+    },
+    {
+      "id": "direct-composer-insertion",
+      "implemented": true,
+      "verification": "desktop-passed; native-input-and-undo"
+    }
+  ],
+  "deviceValidation": {
+    "firefoxAndroid": "not-run",
+    "safariIOS": "conversion-source-only"
+  },
+  "verification": "desktop-tests-passed; android-device-user-validation-pending"
+}

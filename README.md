@@ -2,7 +2,7 @@
 
 **有人说「写长文记得 @ 我」，下次却想不起用户名？把他们留在这里。**
 
-一个轻量的 Chrome / Edge 插件：在 X 上选中 `@用户名`，点旁边的「保存」；发帖时勾选想 @ 的人，一次复制，直接粘贴。
+一个轻量的 Chrome / Edge 与 Firefox 插件：保存 X 联系人的头像、昵称和 `@用户名`；发帖时点小 @ 展开名单，再点联系人直接加入输入框，也支持多选批量加入或复制。
 
 [下载安装包](https://github.com/hskelp9527-pixel/x-mention-saver/releases/latest) · [反馈问题](https://github.com/hskelp9527-pixel/x-mention-saver/issues/new/choose) · [English](#english)
 
@@ -16,9 +16,9 @@
 
 ![选中用户名后显示保存按钮](docs/images/selection-preview-utf8.png)
 
-搜索、备注、勾选，然后一键复制成 `@alice @bob`。
+同时保存头像、显示昵称、@ID 和备注；搜索、勾选，然后一键复制成 ` @alice @bob `（前后保留空白）。
 
-<img src="docs/images/popup-preview-utf8.png" width="390" alt="收藏列表和批量复制弹窗">
+<img src="docs/images/dropdown-preview-utf8.png" width="320" alt="小 @ 按钮展开收藏下拉，默认折叠扫描与手动添加">
 
 ## 能做什么
 
@@ -26,11 +26,12 @@
 - 自动去重：同一用户名忽略大小写；页面重复保存保留已有备注。
 - 收藏管理：手动添加、编辑备注、搜索、删除。
 - 一键复制：单人复制或多选复制，支持空格与换行分隔。
+- 直接加入：在编辑器小 @ 下拉中点头像或昵称插入一人，勾选多人后点「加入输入框」。
 - 本机备份：导出 / 导入 JSON，不需要账号或云服务。
 
 ## 安装，三步即可
 
-目前通过开发者模式安装，尚未上架 Chrome Web Store 或 Edge Add-ons。Windows 和 macOS 上的 Chrome、Edge 都能用（Safari 不支持）。
+目前通过开发者模式安装，尚未上架 Chrome Web Store 或 Edge Add-ons。Windows 和 macOS 上的 Chrome、Edge 都能用。手机平台说明见下方。
 
 1. 在 [Releases](https://github.com/hskelp9527-pixel/x-mention-saver/releases/latest) 下载 **x-mention-saver.zip**，解压到一个准备长期保留的文件夹。
 2. Chrome 地址栏打开 `chrome://extensions`，Edge 打开 `edge://extensions`，开启「开发者模式」。
@@ -40,9 +41,11 @@
 
 ## 怎么用
 
-**保存：** 在 X / Twitter 页面拖选完整的 `@用户名`，点击「+ 保存」。也可以打开插件，手动输入用户名或个人主页链接，加一句备注。
+**保存：** 在 X / Twitter 页面拖选完整的 `@用户名`，点击「+ 保存」，自动读取当前页面中与该账号明确对应的昵称和头像。也可以点编辑工具栏的小「@」，展开「从当前页面添加」，从扫描结果一键保存。未加载到页面的用户不会被扫描；缺失资料可在该用户再次出现时补齐。手动添加默认折叠，作为补充入口。
 
 **复制：** 打开插件，勾选需要 @ 的人，点击「复制选中的 @用户名」，粘贴到正文或回复。搜索只缩小显示范围，复制仍包含全部已勾选的人；数量显示在底部。每次重新打开弹窗，勾选会清空，收藏与备注保留。
+
+**直接加入输入框：** 从发帖或回复框原工具栏的小「@」打开下拉，点联系人的头像或昵称，用户名就加入该输入框的原光标位置，随后收起名单、回到输入框。选中文字会像粘贴一样被替换；可用原生撤销恢复。勾选多人后才展开「加入输入框」与复制操作，自动补好分隔空白。此功能只填写草稿，不点击发布。浏览器工具栏独立弹窗仍使用复制功能。
 
 **备份：** 点击「导出备份」下载 JSON。「导入」会合并，重复用户名保留已有备注。手动重复添加则可以更新备注。
 
@@ -54,9 +57,11 @@
 
 ## 识别与隐私
 
-选中文字去掉首尾空白后，必须完整匹配 `^@[A-Za-z0-9_]{1,15}$`。普通文字、中文昵称、邮箱、多个用户名、包含空格或标点的内容都不会触发；发帖编辑框与输入框内不显示保存按钮。短用户名也允许，以兼容已有账号。只检查格式，不联网验证账号是否存在。
+选中文字去掉首尾空白后，必须完整匹配 `^@[A-Za-z0-9_]{1,15}$`。普通文字、单独选中的中文昵称、邮箱、多个用户名、包含空格或标点的内容都不会触发；发帖编辑框与输入框内不显示保存按钮。短用户名也允许，以兼容已有账号。只检查格式，不联网验证账号是否存在。
 
 收藏仅存于当前浏览器的 `chrome.storage.local`。没有云同步或统计服务，不调用 X API，不自动发帖。权限为 `storage` 与 `clipboardWrite`；内容脚本仅在 X / Twitter 网站运行。所有运行代码都包含在仓库里，没有第三方运行时依赖。
+
+扫描只读取已加载的用户区块；仅自动补齐已收藏联系人的昵称和头像，保留备注。新用户需点击保存。头像保存为官方图片地址，展示时可向 `pbs.twimg.com` / `abs.twimg.com` 加载头像，不携带页面来源；其他图片域名和非头像路径会被拒绝。
 
 ## 开发与验证
 
@@ -92,3 +97,24 @@ Download **x-mention-saver.zip** from [Releases](https://github.com/hskelp9527-p
 Batch copies contain spaces by default. X may not notify accounts mentioned after the first 280 characters of a long post, and recipient notification filters can also apply. This tool copies handles; it does not guarantee notification delivery.
 
 MIT licensed. Independent project, not affiliated with X Corp.
+
+
+## 1.1.0：手机与编辑框入口
+
+Windows Chrome / Edge 使用 `x-mention-saver.zip`。在 X 发帖或回复的原工具栏点击小「@」按钮（悬停提示「记得 @」）打开收藏面板；支持搜索昵称、@ID、备注，点击联系人直接加入输入框，多选加入或复制，单独复制 @ID 或显示昵称。点击「关闭」或按 Escape 返回原入口。面板使用扩展来源 iframe，收藏不会通过页面消息返回给 X；只在用户点击加入时填写选中的 @用户名，不提交帖子。
+
+选中 @ID 保存时，只有明确对应同一账号的 X User-Name / UserCell / UserName 区块才读取昵称和头像；无法确认时保留为空，可在面板中手动编辑昵称。旧收藏自动迁移，备注、ID 和原时间保留；旧 JSON 继续可导入，新导出格式为 v3。页面扫描会更新已收藏用户的非空昵称和头像，保留备注。复制 @ID 时强制空格/换行分隔，并在整段前后保留空白，避免与相邻正文挤在一起；显示昵称不是可用的 @ 提及。
+
+| 平台 | 使用方式与状态 |
+| --- | --- |
+| Windows Chrome / Edge | 原开发者模式安装方式；浏览器自动化测试使用模拟 X 页面 |
+| Android Firefox 142+ | 使用 Firefox 专用清单与经典 background scripts；尚待 Android 真机验证 |
+| Android Chrome、iPhone Chrome | 不运行本扩展，请改用支持扩展的浏览器 |
+| iPhone Safari | 仅提供可转换 WebExtension 源码，需 macOS / Xcode 转换、签名、设备测试和分发；当前没有可直接安装的 iPhone 包 |
+| X App | 无法加载浏览器扩展，需在浏览器打开 X |
+
+Firefox 桌面开发时解压 `x-mention-saver-firefox-unsigned.zip`，在 `about:debugging` 加载临时附加组件。Android 稳定版通常需要 Mozilla 签名和可安装的分发入口；**unsigned ZIP 不是已签名 XPI，不能直接宣称可在手机安装**。上架或自分发签名后再做真机验收。Safari 源码包可用 Apple 官方 `xcrun safari-web-extension-converter <源码目录>` 在 Mac 转换；本仓库未执行转换或签名。
+
+所有收藏仅在当前浏览器本机保存，不自动跨设备同步。重新读取当前 X 用户区块可补充昵称和头像；需要搬迁完整收藏时使用 JSON 导入/导出。工具栏入口仅占一个 30 px 图标位置，不新增一行；没有可确认的所属工具栏时，在编辑器边缘浮动显示，不占布局空间。收藏下拉默认关闭，点击 @ 后紧贴入口展开，最多 340 × 400 px；点击外部、再次点击 @ 或按 Escape 收起，随滚动和可见视口调整。扫描与手动添加也默认折叠。Android 与 iPhone 设备验收仍待执行。
+
+开发检查新增 `npm run check:firefox`（仅静态）。`python scripts/package.py` 生成 Chromium、Firefox unsigned、Safari source 三份 ZIP。Checks 和 tag Release 工作流都会安装 Chromium 并实际运行浏览器测试；发布 tag 必须与 package/manifest 版本相同。Release 工作流上传这三份资产，不执行商店签名或发布。
