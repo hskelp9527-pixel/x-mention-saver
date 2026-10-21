@@ -125,7 +125,7 @@
     panel = document.createElement('div');
     panel.dataset.xmsPanel = '';
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '记得 @ 收藏');
-    panel.style.cssText = 'position:fixed;z-index:2147483646;background:white;border:1px solid #b4d6fa;border-radius:14px;box-shadow:0 8px 40px #0004;overflow:hidden';
+    panel.style.cssText = 'box-sizing:border-box;position:fixed;z-index:2147483646;background:white;border:1px solid #b4d6fa;border-radius:14px;box-shadow:0 8px 40px #0004;overflow:hidden';
     frame = document.createElement('iframe');
     frame.src = chrome.runtime.getURL('popup.html') + '?parentOrigin=' + encodeURIComponent(location.origin); frame.title = '记得 @ 收藏';
     frame.allow = 'clipboard-write';
@@ -192,7 +192,7 @@
       }
       if (floating) {
         button.dataset.xmsFloating = '';
-        button.style.position = 'fixed'; button.style.zIndex = '2147483645';
+        button.style.position = 'fixed'; button.style.zIndex = '2147483400';
         document.documentElement.append(button);
       }
       mounted.set(editor, { button, toolbar, floating }); resizeObserver.observe(editor);

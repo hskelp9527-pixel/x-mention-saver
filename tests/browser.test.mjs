@@ -123,6 +123,8 @@ try {
   await page.locator('#editor3').scrollIntoViewIfNeeded();
   await floating.waitFor({ state: 'visible' });
   await page.setViewportSize({ width: 360, height: 600 });
+  await page.locator('#editor3').scrollIntoViewIfNeeded();
+  await floating.waitFor({ state: 'visible' });
   await page.waitForTimeout(70);
   const floatingBounds = await floating.boundingBox();
   assert.ok(floatingBounds.x >= 0 && floatingBounds.x + floatingBounds.width <= 360);
@@ -139,7 +141,8 @@ try {
   assert.equal(await page.locator('#editor2').textContent(), '回复草稿');
   const panelBounds = await page.locator('[data-xms-panel]').boundingBox();
   assert.ok(panelBounds.x >= 0 && panelBounds.width <= 320 && panelBounds.height <= 480);
-  await savedPanel.locator('#search').press('Escape');
+  await savedPanel.locator('#search').focus();
+  await page.keyboard.press('Escape');
   await page.locator('[data-xms-panel]').waitFor({ state: 'detached' });
   assert.equal(await page.locator('[data-xms-launcher]').nth(1).evaluate(el => el === document.activeElement), true);
   await page.setViewportSize({ width: 1000, height: 740 });
