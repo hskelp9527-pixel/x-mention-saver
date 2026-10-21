@@ -55,7 +55,7 @@ try {
 
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
-  await context.route('https://x.com/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>选中保存演示</title></head><body style="font:20px system-ui;padding:120px 80px"><h2>模拟 X 页面 · 选中用户名即可收藏</h2><span id="handle">@BruceJinji711</span><div data-testid="User-Name"><a href="/new_friend"><span dir="auto">新朋友</span></a><a href="/new_friend"><span id="new">@new_friend</span></a></div><p id="invalid">普通文字</p><p id="email">person@example.com</p><p id="multi">@alice @bob</p><p id="long">@abcdefghijklmnop</p><p id="right" style="position:fixed;right:8px;top:25px">@near_edge</p><div contenteditable="true" id="editor" data-testid="tweetTextarea_0">@in_editor</div><div contenteditable="true" id="editor2" data-testid="tweetTextarea_1">回复草稿</div></body></html>` }));
+  await context.route('https://x.com/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>选中保存演示</title></head><body style="font:20px system-ui;padding:120px 80px"><h2>模拟 X 页面 · 选中用户名即可收藏</h2><span id="handle">@BruceJinji711</span><div data-testid="User-Name"><a href="/new_friend"><span dir="auto">新朋友</span></a><a href="/new_friend"><span id="new">@new_friend</span></a></div><p id="invalid">普通文字</p><p id="email">person@example.com</p><p id="multi">@alice @bob</p><p id="long">@abcdefghijklmnop</p><p id="right" style="position:fixed;right:8px;top:25px">@near_edge</p><section class="composer" id="composer1"><div contenteditable="true" id="editor" data-testid="tweetTextarea_0">@in_editor</div><div data-testid="toolBar" id="toolbar1" style="display:flex;align-items:center;height:36px;flex-wrap:nowrap"><button type="button">媒体</button></div></section><section class="composer" id="composer2"><div contenteditable="true" id="editor2" data-testid="tweetTextarea_1">回复草稿</div><div role="toolbar" id="toolbar2" style="display:flex;align-items:center;height:36px;flex-wrap:nowrap"><button type="button">表情</button></div></section><section class="composer" id="fallback-composer"><div contenteditable="true" id="editor3" data-testid="tweetTextarea_2">没有工具栏的草稿</div></section><script>document.querySelectorAll('.composer').forEach(node => { node.dataset.beforeHeight = node.getBoundingClientRect().height; });</script></body></html>` }));
   await page.goto('https://x.com/home');
   assert.equal(await page.evaluate(() => document.characterSet), 'UTF-8');
   assert.equal(await page.locator('h2').textContent(), '模拟 X 页面 · 选中用户名即可收藏');
@@ -106,8 +106,30 @@ try {
   await popup.locator('#search').fill('');
   const popupHeight = await popup.evaluate(() => document.body.getBoundingClientRect().height);
   await popup.screenshot({ path: join(output, 'popup-preview.png'), clip: { x: 0, y: 0, width: 390, height: popupHeight } });
-  // Each editor gets its own launcher. The panel is extension-origin and never edits a draft.
+  // Existing toolbars keep their height and each editor owns exactly one icon.
+  assert.equal(await page.locator('[data-xms-launcher]').count(), 3);
+  for (const id of ['toolbar1', 'toolbar2']) {
+    assert.equal(await page.locator('#' + id + ' [data-xms-launcher]').count(), 1);
+    assert.equal((await page.locator('#' + id).boundingBox()).height, 36);
+    assert.equal(await page.locator('#' + id + ' [data-xms-launcher]').getAttribute('title'), '记得 @');
+  }
+  for (const id of ['composer1', 'composer2', 'fallback-composer']) {
+    assert.equal(await page.locator('#' + id).evaluate(el => el.getBoundingClientRect().height), Number(await page.locator('#' + id).getAttribute('data-before-height')));
+  }
+  const floating = page.locator('[data-xms-floating]');
+  assert.equal(await floating.count(), 1);
+  assert.equal(await floating.evaluate(el => getComputedStyle(el).position), 'fixed');
+  assert.equal(await page.locator('#fallback-composer [data-xms-launcher]').count(), 0);
+  await page.locator('#editor3').scrollIntoViewIfNeeded();
+  await floating.waitFor({ state: 'visible' });
+  await page.setViewportSize({ width: 360, height: 600 });
+  await page.waitForTimeout(70);
+  const floatingBounds = await floating.boundingBox();
+  assert.ok(floatingBounds.x >= 0 && floatingBounds.x + floatingBounds.width <= 360);
+  await page.locator('#fallback-composer').evaluate(el => el.remove());
+  await floating.waitFor({ state: 'detached' });
   assert.equal(await page.locator('[data-xms-launcher]').count(), 2);
+  // The compact panel is extension-origin and never edits a draft.
   assert.equal((await worker.evaluate(() => chrome.storage.local.get('entries'))).entries.find(entry => entry.id === 'new_friend').displayName, '新朋友');
   await page.setViewportSize({ width: 320, height: 500 });
   await page.locator('[data-xms-launcher]').nth(1).click();
@@ -116,7 +138,7 @@ try {
   assert.equal(await savedPanel.locator('.person').count(), 1);
   assert.equal(await page.locator('#editor2').textContent(), '回复草稿');
   const panelBounds = await page.locator('[data-xms-panel]').boundingBox();
-  assert.ok(panelBounds.x >= 0 && panelBounds.width <= 320 && panelBounds.height <= 500);
+  assert.ok(panelBounds.x >= 0 && panelBounds.width <= 320 && panelBounds.height <= 480);
   await savedPanel.locator('#search').press('Escape');
   await page.locator('[data-xms-panel]').waitFor({ state: 'detached' });
   assert.equal(await page.locator('[data-xms-launcher]').nth(1).evaluate(el => el === document.activeElement), true);

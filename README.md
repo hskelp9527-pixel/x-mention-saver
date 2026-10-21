@@ -96,7 +96,7 @@ MIT licensed. Independent project, not affiliated with X Corp.
 
 ## 1.1.0：手机与编辑框入口
 
-Windows Chrome / Edge 使用 `x-mention-saver.zip`。在 X 发帖或回复编辑框旁点击「@ 记得」打开收藏面板；支持搜索昵称、@ID、备注，多选复制，单独复制 @ID 或显示昵称。点击「关闭」或按 Escape 返回原入口。面板使用扩展来源 iframe，收藏不会通过页面消息返回给 X；不会修改草稿或自动发帖。
+Windows Chrome / Edge 使用 `x-mention-saver.zip`。在 X 发帖或回复的原工具栏点击小「@」按钮（悬停提示「记得 @」）打开收藏面板；支持搜索昵称、@ID、备注，多选复制，单独复制 @ID 或显示昵称。点击「关闭」或按 Escape 返回原入口。面板使用扩展来源 iframe，收藏不会通过页面消息返回给 X；不会修改草稿或自动发帖。
 
 选中 @ID 保存时，只有同一 X User-Name / UserCell / UserName 区块能明确对应昵称才填写；无法确认时保留为空，可在面板中手动编辑。旧收藏自动迁移，备注、ID 和原时间保留；旧 JSON 继续可导入，新导出格式为 v2。页面重复保存不覆盖手动昵称或备注。复制 @ID 时强制空格/换行分隔，并在整段前后保留空白，避免与相邻正文挤在一起；显示昵称不是可用的 @ 提及。
 
@@ -110,6 +110,6 @@ Windows Chrome / Edge 使用 `x-mention-saver.zip`。在 X 发帖或回复编辑
 
 Firefox 桌面开发时解压 `x-mention-saver-firefox-unsigned.zip`，在 `about:debugging` 加载临时附加组件。Android 稳定版通常需要 Mozilla 签名和可安装的分发入口；**unsigned ZIP 不是已签名 XPI，不能直接宣称可在手机安装**。上架或自分发签名后再做真机验收。Safari 源码包可用 Apple 官方 `xcrun safari-web-extension-converter <源码目录>` 在 Mac 转换；本仓库未执行转换或签名。
 
-所有收藏仅在当前浏览器本机保存，不自动跨设备同步。重新读取当前 X 用户区块可补充昵称；需要搬迁完整收藏时使用 JSON 导入/导出。面板在小屏和软键盘出现后按可见视口调整；Android 与 iPhone 设备验收仍待执行。
+所有收藏仅在当前浏览器本机保存，不自动跨设备同步。重新读取当前 X 用户区块可补充昵称；需要搬迁完整收藏时使用 JSON 导入/导出。工具栏入口仅占一个 30 px 图标位置，不新增一行；没有可确认的所属工具栏时，在编辑器边缘浮动显示，不占布局空间。收藏面板默认最多 360 × 480 px，在小屏和软键盘出现后按可见视口调整；Android 与 iPhone 设备验收仍待执行。
 
 开发检查新增 `npm run check:firefox`（仅静态）。`python scripts/package.py` 生成 Chromium、Firefox unsigned、Safari source 三份 ZIP。Checks 和 tag Release 工作流都会安装 Chromium 并实际运行浏览器测试；发布 tag 必须与 package/manifest 版本相同。Release 工作流上传这三份资产，不执行商店签名或发布。

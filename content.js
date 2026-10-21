@@ -102,10 +102,11 @@
   document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
 })();
 
-// Mount one launcher beside each X editor, outside its editable DOM. No editor
+// Mount one small launcher in each editor toolbar, outside its editable DOM. No editor
 // text, selection, submit button or X network request is changed.
 (() => {
-  const mounted = new WeakMap();
+  const editorSelector = '[contenteditable="true"][data-testid^="tweetTextarea_"],textarea[data-testid^="tweetTextarea_"]';
+  const mounted = new Map();
   let panel, frame, launcher;
   function close() {
     panel?.remove(); panel = null; frame = null;
@@ -116,8 +117,8 @@
     const viewport = window.visualViewport;
     panel.style.left = `${(viewport?.offsetLeft || 0) + 8}px`;
     panel.style.top = `${(viewport?.offsetTop || 0) + 8}px`;
-    panel.style.width = `${Math.min(420, (viewport?.width || innerWidth) - 16)}px`;
-    panel.style.height = `${Math.max(100, (viewport?.height || innerHeight) - 16)}px`;
+    panel.style.width = `${Math.min(360, (viewport?.width || innerWidth) - 16)}px`;
+    panel.style.height = `${Math.max(80, Math.min(480, (viewport?.height || innerHeight) - 16))}px`;
   }
   function open(button) {
     close(); launcher = button;
@@ -132,16 +133,71 @@
     panel.append(frame); document.documentElement.append(panel); fit();
     frame.addEventListener('load', () => frame.focus());
   }
-  function mount() {
-    for (const editor of document.querySelectorAll('[contenteditable="true"][data-testid^="tweetTextarea_"],textarea[data-testid^="tweetTextarea_"]')) {
-      if (mounted.get(editor)?.isConnected) continue;
-      const button = document.createElement('button');
-      button.type = 'button'; button.textContent = '@ 记得'; button.dataset.xmsLauncher = '';
-      button.setAttribute('aria-label', '打开记得 @ 收藏'); button.setAttribute('aria-haspopup', 'dialog');
-      button.style.cssText = 'display:block;min-height:44px;padding:8px 14px;margin:4px 0;border:1px solid #b4d6fa;border-radius:24px;background:#fff;color:#0866b9;font:600 14px system-ui;cursor:pointer;touch-action:manipulation';
-      button.addEventListener('click', () => open(button));
-      editor.insertAdjacentElement('afterend', button); mounted.set(editor, button);
+  function toolbarFor(editor) {
+    // Stop before crossing another composer. A page-wide first toolbar could
+    // attach a reply's launcher to the main post editor.
+    for (let scope = editor.parentElement; scope && scope !== document.body; scope = scope.parentElement) {
+      if (scope.querySelectorAll(editorSelector).length !== 1) break;
+      const toolbar = scope.querySelector('[data-testid="toolBar"],[role="toolbar"]');
+      if (toolbar && !editor.contains(toolbar)) return toolbar;
     }
+    return null;
+  }
+  function iconGroup(toolbar) {
+    const originalButton = toolbar.querySelector('button:not([data-xms-launcher]),[role="button"]:not([data-xms-launcher])');
+    const group = originalButton?.parentElement;
+    // Use the existing icon row where available; never create another row.
+    if (group && toolbar.contains(group) && ['flex', 'inline-flex'].includes(getComputedStyle(group).display) && getComputedStyle(group).flexDirection === 'row') return group;
+    return toolbar;
+  }
+  function placeFloating() {
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+    const right = left + (viewport?.width || innerWidth), bottom = top + (viewport?.height || innerHeight);
+    for (const [editor, record] of mounted) {
+      if (!record.floating || !editor.isConnected) continue;
+      const rect = editor.getBoundingClientRect();
+      record.button.style.display = rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right ? 'inline-flex' : 'none';
+      record.button.style.left = `${Math.max(left + 2, Math.min(rect.right - 32, right - 32))}px`;
+      record.button.style.top = `${Math.max(top + 2, Math.min(rect.top + 2, bottom - 32))}px`;
+    }
+  }
+  const resizeObserver = new ResizeObserver(() => { placeFloating(); fit(); });
+  function mount() {
+    for (const [editor, record] of mounted) {
+      if (!editor.isConnected) {
+        if (record.button === launcher && panel) close();
+        record.button.remove(); resizeObserver.unobserve(editor); mounted.delete(editor);
+      }
+    }
+    for (const editor of document.querySelectorAll(editorSelector)) {
+      const toolbar = toolbarFor(editor);
+      const current = mounted.get(editor);
+      if (current?.button.isConnected && current.toolbar === toolbar) continue;
+      current?.button.remove();
+      const button = document.createElement('button');
+      button.type = 'button'; button.textContent = '@'; button.dataset.xmsLauncher = '';
+      button.title = '记得 @';
+      button.setAttribute('aria-label', '打开记得 @ 收藏'); button.setAttribute('aria-haspopup', 'dialog');
+      button.style.cssText = 'box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:0 0 30px;width:30px;height:30px;min-width:30px;max-height:30px;padding:0;margin:0;border:0;border-radius:50%;background:transparent;color:rgb(29,155,240);font:600 20px/1 system-ui;cursor:pointer;touch-action:manipulation;vertical-align:middle';
+      button.addEventListener('click', () => open(button));
+      let floating = !toolbar;
+      if (toolbar) {
+        const beforeHeight = toolbar.getBoundingClientRect().height;
+        iconGroup(toolbar).append(button);
+        // A crowded/wrapping toolbar must not gain a second line.
+        if (toolbar.getBoundingClientRect().height > beforeHeight + 0.5) {
+          button.remove(); floating = true;
+        }
+      }
+      if (floating) {
+        button.dataset.xmsFloating = '';
+        button.style.position = 'fixed'; button.style.zIndex = '2147483645';
+        document.documentElement.append(button);
+      }
+      mounted.set(editor, { button, toolbar, floating }); resizeObserver.observe(editor);
+    }
+    placeFloating();
     if (panel && !launcher?.isConnected) close();
   }
   let scheduled = false;
@@ -153,8 +209,10 @@
     if (frame && event.source === frame.contentWindow && event.origin === chrome.runtime.getURL('').replace(/\/$/, '') && event.data?.type === 'xms-close-panel') close();
   });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
-  window.visualViewport?.addEventListener('resize', fit);
-  window.visualViewport?.addEventListener('scroll', fit);
-  window.addEventListener('resize', fit);
+  const reposition = () => { placeFloating(); fit(); };
+  window.visualViewport?.addEventListener('resize', reposition);
+  window.visualViewport?.addEventListener('scroll', reposition);
+  window.addEventListener('resize', reposition);
+  document.addEventListener('scroll', placeFloating, true);
   mount();
 })();
